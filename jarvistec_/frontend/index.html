@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JarvisTEC</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Sora:wght@300;400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-state="idle" data-emotion="neutral">
+
+  <header class="bar">
+    <h1>JarvisTEC</h1>
+    <div class="bar-right">
+      <span class="api" id="apiStatus" role="status"><i></i><span>Conectando…</span></span>
+      <button class="ghost" id="btnMute" aria-pressed="false">Voz activada</button>
+    </div>
+  </header>
+
+  <main class="hud">
+
+    <section class="panel cam" aria-labelledby="camTitle">
+      <h2 id="camTitle">Cámara</h2>
+      <div class="video-wrap">
+        <video id="video" autoplay playsinline muted></video>
+        <p class="video-empty" id="videoEmpty">La cámara está apagada</p>
+      </div>
+      <div class="row">
+        <button id="btnCam">Encender cámara</button>
+        <button id="btnEmotion" disabled>Analizar emoción</button>
+      </div>
+      <div class="emotion" aria-live="polite">
+        <p class="emotion-label" id="emotionLabel">Sin analizar</p>
+        <p class="emotion-note" id="emotionNote">Enciende la cámara para que JarvisTEC lea tu expresión.</p>
+        <div id="emotionBars" class="bars"></div>
+      </div>
+    </section>
+
+    <section class="core" aria-label="Asistente">
+      <div class="reactor" id="reactor" aria-hidden="true">
+        <svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <radialGradient id="coreGrad" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#ffffff"/>
+              <stop offset="35%" stop-color="var(--accent-soft)"/>
+              <stop offset="100%" stop-color="var(--accent)" stop-opacity=".15"/>
+            </radialGradient>
+          </defs>
+          <g class="ring ring-ticks"><circle cx="200" cy="200" r="188" /></g>
+          <g class="ring ring-arcs"><circle cx="200" cy="200" r="160" /></g>
+          <g class="ring ring-dash"><circle cx="200" cy="200" r="132" /></g>
+          <circle class="ring-solid" cx="200" cy="200" r="108"/>
+          <g class="pulse"><circle class="core-glow" cx="200" cy="200" r="84" fill="url(#coreGrad)"/></g>
+          <polygon class="core-tri" points="200,150 243,225 157,225"/>
+        </svg>
+      </div>
+
+      <p class="status" id="status" role="status">En espera</p>
+      <div class="response" id="response" aria-live="polite">Presiona el micrófono y di «JarvisTEC, precio del bitcoin».</div>
+      <details class="raw" id="raw" hidden>
+        <summary>Ver respuesta de la API</summary>
+        <pre id="rawJson"></pre>
+      </details>
+
+      <div class="controls">
+        <button class="mic" id="btnMic" aria-pressed="false">
+          <span class="mic-dot"></span><span id="micText">Hablar</span>
+        </button>
+      </div>
+
+      <form class="typed" id="typedForm" autocomplete="off">
+        <label for="typed" class="sr">Escribir un comando</label>
+        <input id="typed" type="text" placeholder="O escribe un comando: JarvisTEC, calidad del vino">
+        <button type="submit">Enviar</button>
+      </form>
+    </section>
+
+    <aside class="panel side" aria-label="Comandos y conversación">
+      <h2>Comandos disponibles</h2>
+      <div class="chips" id="commands"><p class="muted">Cargando…</p></div>
+      <h2>Conversación</h2>
+      <ul class="log" id="log"><li class="muted">Aún no hay mensajes.</li></ul>
+    </aside>
+
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
