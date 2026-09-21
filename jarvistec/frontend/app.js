@@ -73,7 +73,10 @@ async function init() {
   try {
     const h = await api("/health");
     el.apiStatus.className = "api ok";
-    el.apiStatus.lastElementChild.textContent = `API conectada · ${h.models.length} modelos`;
+    const simulated = [h.emotion_provider, h.speech_provider].includes("mock");
+    el.apiStatus.lastElementChild.textContent =
+      `API conectada · ${h.models.length} modelos` + (simulated ? " · voz/rostro simulados" : "");
+    if (simulated) el.apiStatus.title = "Sin GOOGLE_API_KEY: /emotion y /transcribe devuelven datos simulados";
     const models = await api("/models");
     renderCommands(models);
   } catch (e) {
@@ -177,8 +180,10 @@ function applyEmotion(data) {
   state.emotion = key;
   document.body.dataset.emotion = key;
   el.emotionLabel.textContent = EMOTION_ES[key] || key;
-  el.emotionNote.textContent = "Emoción dominante detectada.";
-  el.emotionNote.classList.remove("warn");
+  el.emotionNote.textContent = data.provider === "mock"
+    ? "Emoción simulada: aún no hay credenciales de Google."
+    : "Emoción dominante detectada.";
+  el.emotionNote.classList.toggle("warn", data.provider === "mock");
   el.emotionBars.innerHTML = "";
   Object.entries(data.scores || {})
     .sort((a, b) => b[1] - a[1]).slice(0, 5)
@@ -243,8 +248,9 @@ async function onRecordingDone() {
   const blob = new Blob(rec.chunks, { type: rec.media.mimeType || "audio/webm" });
   try {
     const fd = new FormData(); fd.append("audio", blob, "audio.webm");
-    const { text } = await api("/transcribe", { method: "POST", body: fd });
+    const { text, provider } = await api("/transcribe", { method: "POST", body: fd });
     if (!text) throw new Error("No se entendió el audio. Intenta de nuevo.");
+    if (provider === "mock") logLine("err", "Transcripción simulada (sin credenciales de Google).");
     await sendCommand(text);
   } catch (e) {
     say(e.message, true); logLine("err", e.message); setState("idle");

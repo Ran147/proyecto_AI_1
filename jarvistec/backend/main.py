@@ -8,6 +8,7 @@ load_dotenv()
 
 from .models import get_registry  # noqa: E402
 from .routers import command, emotion, models, transcribe  # noqa: E402
+from .services import emotion_service, speech_service  # noqa: E402
 
 app = FastAPI(title="JarvisTEC API", version="0.1.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -18,7 +19,12 @@ for r in (models.router, command.router, emotion.router, transcribe.router):
 
 @app.get("/health", tags=["sistema"])
 def health():
-    return {"status": "ok", "models": list(get_registry().keys())}
+    return {
+        "status": "ok",
+        "models": list(get_registry().keys()),
+        "emotion_provider": emotion_service.provider_name(),
+        "speech_provider": speech_service.provider_name(),
+    }
 
 
 FRONTEND = Path(__file__).resolve().parents[1] / "frontend"

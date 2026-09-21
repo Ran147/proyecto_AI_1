@@ -16,7 +16,7 @@ Copiar `notebooks/plantilla_modelo.ipynb` y renombrarla. Ya trae las 6 secciones
 Pasos:
 1. Poner el CSV en `data/` (no se sube a git).
 2. Editar **solo la celda de Configuración** (nombre del modelo, ruta, columna objetivo, tipo de tarea, si es serie temporal).
-3. Ejecutar de arriba abajo y completar los textos marcados con **COMPLETAR**. La rúbrica califica el análisis y las conclusiones, no solo el código.
+3. Ejecutar de arriba abajo y completar los textos marcados con **✍️ COMPLETAR**. La rúbrica califica el análisis y las conclusiones, no solo el código.
 4. La última celda de código guarda `artifacts/<nombre>.joblib` (un `Pipeline` completo con preprocesamiento) y `artifacts/<nombre>.meta.json` con las métricas y un `default_input` listo para copiar al backend.
 
 Notas:

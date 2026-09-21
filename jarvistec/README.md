@@ -9,7 +9,7 @@ Proyecto grupal de Inteligencia Artificial, TEC.
 python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env             # completar claves (nunca subir .env)
+cp .env.example .env             # completar GOOGLE_API_KEY (ver docs/CONFIGURAR_GOOGLE.md)
 uvicorn backend.main:app --reload
 ```
 
@@ -28,8 +28,8 @@ Ejecutar SIEMPRE desde la raíz del repo (la carpeta que contiene `backend/`).
 | GET | `/models/{name}` | Metadatos de un modelo |
 | POST | `/models/{name}/predict` | Ejecuta un modelo. Body: `{"inputs": {...}}` |
 | POST | `/command` | Texto transcrito -> modelo correcto. Body: `{"text": "JarvisTEC precio del bitcoin"}` |
-| POST | `/emotion` | (pendiente) imagen -> emoción |
-| POST | `/transcribe` | (pendiente) audio -> texto |
+| POST | `/emotion` | Imagen (campo `image`) -> emoción dominante y puntajes |
+| POST | `/transcribe` | Audio (campo `audio`) -> texto transcrito |
 
 ## Estructura
 
@@ -37,10 +37,10 @@ Ejecutar SIEMPRE desde la raíz del repo (la carpeta que contiene `backend/`).
 backend/models/    un archivo por modelo (se registran solos)
 backend/services/  lógica: router de comandos, (luego) rostro y voz
 backend/routers/   endpoints
-notebooks/         un notebook por dataset (entrenamiento y análisis)
+notebooks/         plantilla_modelo.ipynb + un notebook por dataset
 artifacts/         modelos entrenados (.joblib), ignorados por git
 data/              datasets, ignorados por git
-frontend/          HTML + JS (pendiente)
+frontend/          HTML + CSS + JS (la API lo sirve en http://localhost:8000/)
 ```
 
 ## Agregar un modelo

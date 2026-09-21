@@ -15,12 +15,19 @@ def normalize(text: str) -> str:
 
 
 def strip_wake_word(text: str) -> tuple[str, bool]:
-    """Quita 'JarvisTEC' (y variantes como 'jarvis tec') del inicio. Devuelve (texto, había_palabra)."""
+    """Quita 'JarvisTEC' del inicio, tolerando variantes de la transcripción
+    ('jarvis tec', 'yarvis tek'...). Devuelve (texto_sin_palabra, había_palabra)."""
     wake = normalize(os.getenv("WAKE_WORD", "jarvistec"))
     t = normalize(text)
     for variant in (wake, "jarvis tec", "jarvis"):
         if t.startswith(variant):
             return t[len(variant):].strip(), True
+    words = t.split()
+    for n in (2, 1):  # una o dos palabras iniciales pegadas: "yarvis tek" -> "yarvistek"
+        if len(words) >= n:
+            head = "".join(words[:n])
+            if SequenceMatcher(None, head, wake).ratio() >= 0.75:
+                return " ".join(words[n:]), True
     return t, False
 
 
