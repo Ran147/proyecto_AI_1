@@ -1,0 +1,20 @@
+[project]
+name = "jarvistec"
+version = "0.1.0"
+description = "Voice and vision assistant that runs machine learning models."
+requires-python = ">=3.10"
+
+[tool.ruff]
+line-length = 79
+target-version = "py310"
+
+[tool.ruff.lint]
+# pycodestyle (PEP 8), pyflakes, import order, PEP 8 naming.
+select = ["E", "W", "F", "I", "N"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+filterwarnings = [
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated",
+]
