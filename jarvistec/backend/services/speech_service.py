@@ -9,7 +9,7 @@ import os
 import httpx
 from fastapi import HTTPException
 
-from ..models import get_registry
+from ..core.orchestrator import get_orchestrator
 
 SPEECH_URL = "https://speech.googleapis.com/v1/speech:recognize"
 
@@ -33,9 +33,7 @@ def _encoding_for(content_type: str) -> str | None:
 
 def build_config(content_type: str) -> dict:
     # Frases de sugerencia: mejoran mucho el reconocimiento de "JarvisTEC" y de los comandos
-    phrases = ["JarvisTEC", "Jarvis TEC"]
-    for m in get_registry().values():
-        phrases.extend(m.keywords)
+    phrases = ["JarvisTEC", "Jarvis TEC", *get_orchestrator().command_phrases()]
     config = {
         "languageCode": os.getenv("SPEECH_LANGUAGE", "es-CR"),
         "enableAutomaticPunctuation": False,

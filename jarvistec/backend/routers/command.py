@@ -1,9 +1,8 @@
 from typing import Any
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel as Schema
 
-from ..models import get_registry
-from ..services.intent_router import match_command, strip_wake_word
+from ..core.orchestrator import ModelOrchestrator, get_orchestrator
 
 router = APIRouter(tags=["comandos"])
 
@@ -14,15 +13,5 @@ class CommandRequest(Schema):
 
 
 @router.post("/command")
-def command(body: CommandRequest):
-    _, had_wake = strip_wake_word(body.text)
-    model, score = match_command(body.text)
-    if model is None:
-        return {
-            "matched": False,
-            "wake_word": had_wake,
-            "message": "No entendí el comando. Prueba con: "
-            + ", ".join(m.keywords[0] for m in get_registry().values() if m.keywords),
-        }
-    out = model.run(body.inputs)
-    return {"matched": True, "wake_word": had_wake, "score": round(score, 2), **out}
+def command(body: CommandRequest, orch: ModelOrchestrator = Depends(get_orchestrator)):
+    return orch.handle_command(body.text, body.inputs)

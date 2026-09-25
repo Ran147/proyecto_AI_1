@@ -9,3 +9,7 @@ scikit-learn
 joblib
 httpx
 pytest
+
+# Offline training (training/<name>/notebook.ipynb); not imported by the backend
+matplotlib   # plots in the EDA and evaluation sections of the notebook template
+ipykernel    # runs the notebooks in Jupyter / VS Code

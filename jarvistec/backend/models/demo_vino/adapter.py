@@ -1,18 +1,18 @@
-"""MODELO DE JUGUETE (reemplazar por el real). Clasificación basada en reglas."""
 from typing import Any
-from .base import BaseModel
+
+from ..base import BaseModel
+from .schema import VinoInputs
 
 
-class ToyWine(BaseModel):
+class DemoVino(BaseModel):
     name = "vino"
-    title = "Calidad del vino (juguete)"
-    description = "Clasificación falsa por reglas: alcohol alto y acidez volátil baja => buena."
+    title = "Calidad del vino (demo, sin entrenar)"
+    description = ("DEMO, no es un modelo entrenado: regla fija "
+                   "(alcohol alto y acidez volátil baja => buena).")
     task_type = "clasificacion"
+    is_demo = True
     keywords = ["calidad del vino", "vino", "clasificar vino"]
-    input_fields = {
-        "alcohol": "float, % de alcohol",
-        "volatile_acidity": "float, acidez volátil",
-    }
+    input_schema = VinoInputs
     default_input = {"alcohol": 11.5, "volatile_acidity": 0.4}
 
     def predict(self, inputs: dict[str, Any]) -> dict[str, Any]:

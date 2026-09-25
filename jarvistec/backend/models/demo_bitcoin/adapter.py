@@ -1,15 +1,17 @@
-"""MODELO DE JUGUETE (reemplazar por el real). Sirve para probar el flujo completo."""
 from typing import Any
-from .base import BaseModel
+
+from ..base import BaseModel
+from .schema import BitcoinInputs
 
 
-class ToyBitcoin(BaseModel):
+class DemoBitcoin(BaseModel):
     name = "bitcoin"
-    title = "Precio de Bitcoin (juguete)"
-    description = "Predicción falsa: aplica un +1% al último precio. Ejemplo de serie temporal."
+    title = "Precio de Bitcoin (demo, sin entrenar)"
+    description = "DEMO, no es un modelo entrenado: aplica un +1% al último precio. Ejemplo de serie temporal."
     task_type = "serie_temporal"
+    is_demo = True
     keywords = ["precio del bitcoin", "bitcoin", "precio de bitcoin para mañana"]
-    input_fields = {"last_price": "float, último precio en USD"}
+    input_schema = BitcoinInputs
     default_input = {"last_price": 60000.0}
 
     def predict(self, inputs: dict[str, Any]) -> dict[str, Any]:

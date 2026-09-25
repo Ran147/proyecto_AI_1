@@ -34,14 +34,24 @@ Ejecutar SIEMPRE desde la raíz del repo (la carpeta que contiene `backend/`).
 ## Estructura
 
 ```
-backend/models/    un archivo por modelo (se registran solos)
-backend/services/  lógica: router de comandos, (luego) rostro y voz
-backend/routers/   endpoints
-notebooks/         plantilla_modelo.ipynb + un notebook por dataset
-artifacts/         modelos entrenados (.joblib), ignorados por git
-data/              datasets, ignorados por git
-frontend/          HTML + CSS + JS (la API lo sirve en http://localhost:8000/)
+backend/
+  core/orchestrator.py  único punto de acceso a los modelos: catálogo, predicción y comandos
+  core/registry.py      registro de modelos; falla al iniciar si hay nombres duplicados
+  models/__init__.py    MODEL_CLASSES: lista explícita de modelos activos
+  models/base.py        contrato BaseModel que implementa cada adaptador
+  models/<nombre>/      un paquete por modelo: adapter.py + schema.py (solo inferencia)
+  services/             router de intenciones, rostro y voz
+  routers/              endpoints HTTP (delegan en el orquestador)
+training/               entrenamiento offline, nunca importado por el backend
+  _plantilla/           notebook con las 6 secciones + ficha del modelo
+  <nombre>/             un directorio por modelo real
+artifacts/              modelos entrenados (.joblib + .meta.json), ignorados por git
+data/                   datasets, ignorados por git
+frontend/               HTML + CSS + JS (la API lo sirve en http://localhost:8000/)
 ```
+
+Los modelos `bitcoin` y `vino` actuales son **demos sin entrenar** (`backend/models/demo_*`,
+`"demo": true` en `GET /models`); sirven para probar el flujo mientras llegan los modelos reales.
 
 ## Agregar un modelo
 

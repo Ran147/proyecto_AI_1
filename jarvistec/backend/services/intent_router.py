@@ -1,10 +1,13 @@
-"""Convierte texto transcrito en un modelo a ejecutar (palabras clave + coincidencia aproximada)."""
+"""Convierte texto transcrito en un modelo a ejecutar (palabras clave + coincidencia aproximada).
+
+Funciones puras: no conocen el registro. El orquestador les pasa los modelos.
+"""
 import os
 import re
 import unicodedata
+from collections.abc import Iterable
 from difflib import SequenceMatcher
 
-from ..models import get_registry
 from ..models.base import BaseModel
 
 
@@ -43,10 +46,10 @@ def _score(keyword: str, text: str) -> float:
     return best if best >= 0.85 else 0.0
 
 
-def match_command(text: str) -> tuple[BaseModel | None, float]:
+def match_command(text: str, models: Iterable[BaseModel]) -> tuple[BaseModel | None, float]:
     cleaned, _ = strip_wake_word(text)
     best_model, best_score = None, 0.0
-    for model in get_registry().values():
+    for model in models:
         for kw in model.keywords:
             s = _score(kw, cleaned)
             if s > best_score:
