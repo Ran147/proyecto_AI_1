@@ -1,15 +1,19 @@
 /* JarvisTEC frontend.
  *
  * API contract:
+ *   GET  /models      -> [{ name, title, keywords, default_input, input_fields, input_options }]
+ *   POST /command     JSON { text, inputs_by_model } -> { matched, message, model, result, ... }
  *   POST /emotion     multipart field "image" -> { emotion, scores, provider }
  *   POST /transcribe  multipart field "audio" -> { text, confidence, provider }
- *   POST /command     JSON { text }           -> { matched, message, model, result, ... }
- *
- * All text shown to the user is Spanish.
+ *                     (only when the server has a speech provider; otherwise
+ *                     the browser's own speech recognition transcribes, see
+ *                     "Microphone")
  */
 
 // Optional API base URL, e.g. ?api=http://localhost:8000
 const API = new URLSearchParams(location.search).get("api") || "";
+// Language of the speech recognition and of the spoken answers.
+const LANGUAGE = "en-US";
 
 const $ = (id) => document.getElementById(id);
 const el = {
@@ -24,20 +28,29 @@ const el = {
   commands: $("commands"), log: $("log"),
 };
 
-const STATUS = { idle: "En espera", listening: "Escuchando", thinking: "Procesando", speaking: "Respondiendo" };
+const STATUS = { idle: "Standing by", listening: "Listening", thinking: "Processing", speaking: "Answering" };
 const EMOTION_LABELS = {
-  happiness: "Alegría", sadness: "Tristeza", anger: "Enojo", surprise: "Sorpresa",
-  fear: "Miedo", disgust: "Asco", contempt: "Desprecio", neutral: "Neutral",
+  happiness: "Happiness", sadness: "Sadness", anger: "Anger", surprise: "Surprise",
+  fear: "Fear", disgust: "Disgust", contempt: "Contempt", neutral: "Neutral",
 };
-// Aliases for providers (Azure, Google) that use other emotion names.
+// Aliases for providers that use other emotion names (Google Vision).
 const EMOTION_ALIAS = { happy: "happiness", joy: "happiness", sad: "sadness", sorrow: "sadness", angry: "anger" };
 const EMOTION_PREFIX = {
-  sadness: "Te noto un poco decaído. ", anger: "Entiendo que estés molesto. Vamos con calma. ",
-  happiness: "¡Qué buen ánimo! ", surprise: "", fear: "Tranquilo, aquí estoy. ",
+  sadness: "You seem a little down. ", anger: "I understand you are upset. Let's take it calmly. ",
+  happiness: "Glad to see you in a good mood! ", surprise: "", fear: "It's all right, I'm here. ",
 };
+const NO_EMOTION_NOTE = "Turn the camera on so JarvisTEC can read your expression.";
 
-let state = { camOn: false, stream: null, recording: false, voice: true, emotion: "neutral", busy: false };
+// speech: "server" sends the audio to POST /transcribe; "browser" uses the
+// Web Speech API of Chrome and Edge, which needs no API key; "none" when
+// neither is available.
+let state = { camOn: false, stream: null, recording: false, voice: true, emotion: "neutral", busy: false, speech: "none" };
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognition = null;
+let currentUtterance = null;
 let rec = { media: null, chunks: [], stream: null, ctx: null, raf: 0 };
+// Values the user edited in each model's data form: { model: { field: value } }.
+const customInputs = {};
 
 /* ---------- Utilities ---------- */
 function setState(s) {
@@ -61,15 +74,25 @@ async function api(path, opts) {
   if (!r.ok) throw new Error(body?.detail || `Error ${r.status}`);
   return body;
 }
+function stopSpeaking() {
+  // A cancelled utterance still fires "end" later; it must not touch the state.
+  currentUtterance = null;
+  window.speechSynthesis?.cancel();
+}
 function speak(text) {
   if (!state.voice || !("speechSynthesis" in window)) return;
-  speechSynthesis.cancel();
+  stopSpeaking();
   const u = new SpeechSynthesisUtterance(text);
-  u.lang = "es-CR";
+  u.lang = LANGUAGE;
   const voices = speechSynthesis.getVoices();
-  u.voice = voices.find(v => v.lang === "es-CR") || voices.find(v => v.lang.startsWith("es")) || null;
-  u.onstart = () => setState("speaking");
-  u.onend = u.onerror = () => setState("idle");
+  u.voice = voices.find(v => v.lang === LANGUAGE) || voices.find(v => v.lang.startsWith("en")) || null;
+  u.onstart = () => { if (currentUtterance === u) setState("speaking"); };
+  u.onend = u.onerror = () => {
+    if (currentUtterance !== u) return;
+    currentUtterance = null;
+    setState("idle");
+  };
+  currentUtterance = u;
   speechSynthesis.speak(u);
 }
 
@@ -78,21 +101,32 @@ async function init() {
   try {
     const h = await api("/health");
     el.apiStatus.className = "api ok";
-    const simulated = [h.emotion_provider, h.speech_provider].includes("mock");
+    // The server transcribes when it has a provider; otherwise the browser does.
+    if (["google", "mock"].includes(h.speech_provider)) state.speech = "server";
+    else if (SpeechRecognition) state.speech = "browser";
+    const notes = [];
+    if (state.speech === "browser") notes.push("voice: browser");
+    else if (state.speech === "none") notes.push("voice unavailable");
+    else if (h.speech_provider === "mock") notes.push("simulated voice");
+    if (h.emotion_provider === "mock") notes.push("simulated face");
     el.apiStatus.lastElementChild.textContent =
-      `API conectada · ${h.models.length} modelos` + (simulated ? " · voz/rostro simulados" : "");
-    if (simulated) el.apiStatus.title = "Sin GOOGLE_API_KEY: /emotion y /transcribe devuelven datos simulados";
+      [`API connected · ${h.models.length} models`, ...notes].join(" · ");
+    if (state.speech === "none") {
+      el.apiStatus.title = "This browser has no speech recognition: use Chrome or Edge, or type the command";
+    }
     const models = await api("/models");
     renderCommands(models);
   } catch (e) {
     el.apiStatus.className = "api down";
-    el.apiStatus.lastElementChild.textContent = "API no disponible";
-    el.commands.innerHTML = '<p class="muted">No se pudo cargar. ¿Está corriendo uvicorn?</p>';
+    el.apiStatus.lastElementChild.textContent = "API unavailable";
+    el.commands.innerHTML = '<p class="muted">Could not load the commands. Is uvicorn running?</p>';
   }
 }
 function renderCommands(models) {
   el.commands.innerHTML = "";
   models.forEach(m => {
+    const item = document.createElement("div");
+    item.className = "chip-item";
     const b = document.createElement("button");
     b.className = "chip";
     const phrase = m.keywords[0] || m.name;
@@ -100,23 +134,158 @@ function renderCommands(models) {
     b.querySelector("b").textContent = `JarvisTEC, ${phrase}`;
     b.querySelector("small").textContent = m.title;
     b.onclick = () => sendCommand(`JarvisTEC ${phrase}`);
-    el.commands.appendChild(b);
+    item.appendChild(b);
+    const fields = Object.keys(m.default_input || {});
+    if (fields.length) {
+      const toggle = document.createElement("button");
+      toggle.className = "chip-data"; toggle.type = "button";
+      toggle.textContent = "Data";
+      toggle.setAttribute("aria-expanded", "false");
+      toggle.title = "Edit the data this model uses";
+      const form = buildInputForm(m, phrase);
+      form.hidden = true;
+      toggle.onclick = () => {
+        form.hidden = !form.hidden;
+        toggle.setAttribute("aria-expanded", String(!form.hidden));
+      };
+      item.append(toggle, form);
+    }
+    el.commands.appendChild(item);
   });
+}
+
+/* ---------- Data form of each model ---------- */
+// The form is generated from GET /models: one control per default_input
+// field. Only the values the user changed are sent; the rest keep the
+// model's defaults.
+function buildInputForm(m, phrase) {
+  const form = document.createElement("form");
+  form.className = "inputs"; form.autocomplete = "off"; form.noValidate = true;
+  Object.entries(m.default_input).forEach(([field, value]) => {
+    const label = document.createElement("label");
+    const name = document.createElement("span");
+    name.textContent = field;
+    const description = (m.input_fields || {})[field] || "";
+    const options = (m.input_options || {})[field];
+    let control;
+    if (options) {
+      control = document.createElement("select");
+      options.forEach(o => {
+        const opt = document.createElement("option");
+        opt.value = String(o); opt.textContent = String(o);
+        control.appendChild(opt);
+      });
+    } else {
+      control = document.createElement("input");
+      control.type = typeof value === "number" ? "number" : "text";
+      // "int, ..." fields take whole numbers.
+      if (control.type === "number") control.step = description.startsWith("int") ? "1" : "any";
+    }
+    control.name = field;
+    // Optional lists arrive as null; their description says what they hold.
+    const isList = Array.isArray(value) || (value === null && /\bprices\b|\blist\b/i.test(description));
+    control.dataset.kind = isList ? "list" : value === null ? "optional" : typeof value;
+    control.value = formatValue(value);
+    control.dataset.initial = control.value;
+    label.title = description || field;
+    const hint = document.createElement("small");
+    hint.textContent = describeField(description);
+    label.append(name, control, hint);
+    form.appendChild(label);
+  });
+  const actions = document.createElement("div");
+  actions.className = "inputs-actions";
+  const run = document.createElement("button");
+  run.type = "submit"; run.textContent = "Run with this data";
+  const reset = document.createElement("button");
+  reset.type = "button"; reset.className = "ghost"; reset.textContent = "Reset";
+  reset.onclick = () => {
+    form.querySelectorAll("[name]").forEach(c => { c.value = c.dataset.initial; });
+    delete customInputs[m.name];
+  };
+  actions.append(run, reset);
+  form.appendChild(actions);
+  // Edited values also apply to spoken and typed commands for this model.
+  form.oninput = () => {
+    try { customInputs[m.name] = readForm(form); } catch { /* reported on submit */ }
+  };
+  form.onsubmit = (e) => {
+    e.preventDefault();
+    try {
+      customInputs[m.name] = readForm(form);
+    } catch (error) {
+      say(error.message, true); logLine("err", error.message);
+      el.response.scrollIntoView({ block: "center", behavior: "smooth" });
+      return;
+    }
+    sendCommand(`JarvisTEC ${phrase}`);
+  };
+  return form;
+}
+function formatValue(value) {
+  if (value === null || value === undefined) return "";
+  if (Array.isArray(value)) return value.join(", ");
+  return String(value);
+}
+// "float, alcohol, % vol." -> "alcohol, % vol."
+function describeField(text) {
+  if (!text) return "";
+  const cut = text.indexOf(", ");
+  return cut === -1 ? "" : text.slice(cut + 2);
+}
+// "1.10, 1.12 1.15" -> [1.10, 1.12, 1.15]; anything that is not a number is
+// an error instead of being dropped silently.
+function parseNumberList(field, raw) {
+  const parts = raw.split(/[\s,;]+/).filter(Boolean);
+  const numbers = parts.map(Number);
+  if (numbers.some(Number.isNaN)) {
+    throw new Error(`${field}: write numbers separated by commas, with a decimal point (for example 1.10, 1.25).`);
+  }
+  return numbers;
+}
+function readForm(form) {
+  const values = {};
+  form.querySelectorAll("[name]").forEach(c => {
+    if (c.value === c.dataset.initial) return;  // unchanged: keep the default
+    const raw = c.value.trim();
+    const kind = c.dataset.kind;
+    if (kind === "number") {
+      if (raw === "") return;  // emptied: keep the default
+      if (Number.isNaN(Number(raw))) throw new Error(`${c.name}: write a number.`);
+      values[c.name] = Number(raw);
+    } else if (kind === "list") {
+      if (raw === "" && c.dataset.initial === "") return;  // optional list left empty
+      values[c.name] = parseNumberList(c.name, raw);
+    } else if (kind === "optional") {
+      if (raw !== "") values[c.name] = raw;  // e.g. a date
+    } else if (kind === "boolean") {
+      values[c.name] = raw === "true";
+    } else {
+      values[c.name] = raw;
+    }
+  });
+  return values;
 }
 
 async function sendCommand(text) {
   text = text.trim();
-  if (!text || state.busy) return;
+  if (!text) return false;
+  if (state.busy) {
+    logLine("err", "Still working on the previous command; try again in a moment.");
+    return false;
+  }
   state.busy = true;
+  stopSpeaking();
   setState("thinking");
   logLine("you", text);
   say("…");
+  el.response.scrollIntoView({ block: "center", behavior: "smooth" });
   try {
     // With the camera on, the emotion is read in parallel with the command.
     const emoP = state.camOn ? analyzeEmotion({ silent: true }) : Promise.resolve(null);
     const data = await api("/command", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, inputs_by_model: customInputs }),
     });
     await emoP;
     showRaw(data);
@@ -125,13 +294,14 @@ async function sendCommand(text) {
     } else {
       const msg = (EMOTION_PREFIX[state.emotion] || "") + data.message;
       say(msg); logLine("bot", msg); speak(msg);
-      if (!state.voice) setState("idle");
+      if (!currentUtterance) setState("idle");
     }
   } catch (e) {
     say(e.message, true); logLine("err", e.message); setState("idle");
   } finally {
     state.busy = false;
   }
+  return true;
 }
 function showRaw(data) {
   el.raw.hidden = false;
@@ -139,23 +309,33 @@ function showRaw(data) {
 }
 
 /* ---------- Camera and emotion ---------- */
+// Without a current reading the assistant must not keep reacting to an old one.
+function clearEmotion(note) {
+  state.emotion = "neutral";
+  document.body.dataset.emotion = "neutral";
+  el.emotionLabel.textContent = "Not analyzed";
+  el.emotionBars.innerHTML = "";
+  if (note) el.emotionNote.textContent = note;
+}
 async function toggleCamera() {
   if (state.camOn) {
     state.stream.getTracks().forEach(t => t.stop());
     state.camOn = false; el.video.srcObject = null;
     el.videoWrap.classList.remove("on");
-    el.btnCam.textContent = "Encender cámara"; el.btnEmotion.disabled = true;
+    el.btnCam.textContent = "Turn camera on"; el.btnEmotion.disabled = true;
+    clearEmotion(NO_EMOTION_NOTE);
+    el.emotionNote.classList.remove("warn");
     return;
   }
   try {
     state.stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
     el.video.srcObject = state.stream;
     state.camOn = true; el.videoWrap.classList.add("on");
-    el.btnCam.textContent = "Apagar cámara"; el.btnEmotion.disabled = false;
-    el.emotionNote.textContent = "Pulsa «Analizar emoción» o envía un comando: se analiza solo.";
+    el.btnCam.textContent = "Turn camera off"; el.btnEmotion.disabled = false;
+    el.emotionNote.textContent = 'Press "Analyze emotion" or send a command: it is analyzed automatically.';
     el.emotionNote.classList.remove("warn");
   } catch (e) {
-    el.emotionNote.textContent = "No se pudo acceder a la cámara. Revisa los permisos del navegador.";
+    el.emotionNote.textContent = "Could not access the camera. Check the browser permissions.";
     el.emotionNote.classList.add("warn");
   }
 }
@@ -165,18 +345,42 @@ function captureFrame() {
   c.getContext("2d").drawImage(el.video, 0, 0, c.width, c.height);
   return new Promise(res => c.toBlob(res, "image/jpeg", 0.85));
 }
+// One frame can catch a blink or a half-formed expression, so a few frames
+// are analyzed and their scores averaged.
+const EMOTION_FRAMES = 3;
+const EMOTION_FRAME_GAP_MS = 150;
+async function readEmotion() {
+  const readings = [];
+  let lastError = null;
+  for (let i = 0; i < EMOTION_FRAMES; i++) {
+    if (i) await new Promise(r => setTimeout(r, EMOTION_FRAME_GAP_MS));
+    try {
+      const fd = new FormData(); fd.append("image", await captureFrame(), "frame.jpg");
+      readings.push(await api("/emotion", { method: "POST", body: fd }));
+    } catch (e) {
+      lastError = e;
+    }
+  }
+  if (!readings.length) throw lastError;
+  const scores = {};
+  readings.forEach(r => Object.entries(r.scores || {}).forEach(([k, v]) => {
+    scores[k] = (scores[k] || 0) + v / readings.length;
+  }));
+  const ranked = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+  // Providers without scores for every emotion (Google) keep their own verdict.
+  const emotion = readings[0].provider === "local" && ranked.length ? ranked[0][0] : readings[0].emotion;
+  return { ...readings[0], emotion, scores, frames: readings.length };
+}
 async function analyzeEmotion({ silent = false } = {}) {
   if (!state.camOn) return null;
   try {
-    const blob = await captureFrame();
-    const fd = new FormData(); fd.append("image", blob, "frame.jpg");
-    const data = await api("/emotion", { method: "POST", body: fd });
+    const data = await readEmotion();
     applyEmotion(data);
     return data;
   } catch (e) {
-    el.emotionNote.textContent = e.message;
+    clearEmotion(e.message);
     el.emotionNote.classList.add("warn");
-    if (!silent) logLine("err", `Emoción: ${e.message}`);
+    if (!silent) logLine("err", `Emotion: ${e.message}`);
     return null;
   }
 }
@@ -186,8 +390,8 @@ function applyEmotion(data) {
   document.body.dataset.emotion = key;
   el.emotionLabel.textContent = EMOTION_LABELS[key] || key;
   el.emotionNote.textContent = data.provider === "mock"
-    ? "Emoción simulada: aún no hay credenciales de Google."
-    : "Emoción dominante detectada.";
+    ? "Simulated emotion: the local emotion models are missing."
+    : "Dominant emotion detected.";
   el.emotionNote.classList.toggle("warn", data.provider === "mock");
   el.emotionBars.innerHTML = "";
   Object.entries(data.scores || {})
@@ -206,33 +410,104 @@ function applyEmotion(data) {
 }
 
 /* ---------- Microphone ---------- */
+const MIC_DENIED = "Could not access the microphone. Check the browser permissions.";
+function showListening() {
+  state.recording = true;
+  el.btnMic.setAttribute("aria-pressed", "true"); el.micText.textContent = "Stop";
+  setState("listening");
+  say("I'm listening…");
+}
 async function toggleMic() {
   if (state.recording) return stopRecording();
+  if (state.speech === "browser") return startBrowserSpeech();
+  if (state.speech === "none") {
+    say("This browser has no speech recognition. Use Chrome or Edge, or type the command.", true);
+    return;
+  }
   try {
     rec.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
   } catch {
-    say("No se pudo acceder al micrófono. Revisa los permisos del navegador.", true);
+    say(MIC_DENIED, true);
     return;
   }
-  speechSynthesis?.cancel();
+  stopSpeaking();
   rec.chunks = [];
   rec.media = new MediaRecorder(rec.stream);  // usually webm/opus
   rec.media.ondataavailable = e => e.data.size && rec.chunks.push(e.data);
   rec.media.onstop = onRecordingDone;
   rec.media.start();
   watchLevel(rec.stream);
-  state.recording = true;
-  el.btnMic.setAttribute("aria-pressed", "true"); el.micText.textContent = "Detener";
-  setState("listening");
-  say("Te escucho…");
+  showListening();
 }
 function stopRecording() {
-  state.recording = false;
+  // The browser recognizer finishes in its own "end" event.
+  if (recognition) return recognition.stop();
   rec.media.stop();
-  rec.stream.getTracks().forEach(t => t.stop());
-  cancelAnimationFrame(rec.raf); rec.ctx?.close();
+  releaseMic();
+}
+function releaseMic() {
+  state.recording = false;
+  rec.stream?.getTracks().forEach(t => t.stop());
+  rec.stream = null;
+  cancelAnimationFrame(rec.raf); rec.ctx?.close(); rec.ctx = null;
   el.reactor.style.setProperty("--level", 0);
-  el.btnMic.setAttribute("aria-pressed", "false"); el.micText.textContent = "Hablar";
+  el.btnMic.setAttribute("aria-pressed", "false"); el.micText.textContent = "Speak";
+}
+
+/* Speech recognition in the browser (Web Speech API): no audio is sent to
+ * the backend, only the transcribed text goes to POST /command. It stops by
+ * itself after a pause, or when the button is pressed again. */
+const SPEECH_ERRORS = {
+  "not-allowed": MIC_DENIED,
+  "service-not-allowed": MIC_DENIED,
+  "audio-capture": "No microphone was found.",
+  "no-speech": "I did not hear anything. Try again.",
+  "network": "The browser's speech recognition needs an internet connection.",
+};
+const NOT_UNDERSTOOD = "I could not understand the audio. Try again.";
+function startBrowserSpeech() {
+  stopSpeaking();
+  let finalText = "", error = null;
+  recognition = new SpeechRecognition();
+  recognition.lang = LANGUAGE;
+  recognition.interimResults = true;  // show the words while they are said
+  recognition.maxAlternatives = 1;
+  recognition.onresult = (e) => {
+    let heard = "";
+    finalText = "";
+    for (const result of e.results) {
+      if (result.isFinal) finalText += result[0].transcript;
+      heard += result[0].transcript;
+    }
+    say(heard || "I'm listening…");
+  };
+  recognition.onerror = (e) => { error = e.error; };
+  recognition.onend = async () => {
+    recognition = null;
+    releaseMic();
+    const text = finalText.trim();
+    if (text) {
+      if (!(await sendCommand(text))) setState("idle");
+      return;
+    }
+    // "aborted" only happens when the user stops before saying anything.
+    const message = SPEECH_ERRORS[error] || NOT_UNDERSTOOD;
+    say(message, true); logLine("err", message); setState("idle");
+  };
+  try {
+    recognition.start();
+  } catch {
+    recognition = null;
+    say("Could not start the speech recognition.", true);
+    return;
+  }
+  showListening();
+  // Only for the reactor animation; recognition does not depend on it.
+  navigator.mediaDevices?.getUserMedia({ audio: true }).then((stream) => {
+    if (!state.recording) return stream.getTracks().forEach(t => t.stop());
+    rec.stream = stream;
+    watchLevel(stream);
+  }).catch(() => {});
 }
 function watchLevel(stream) {
   // The reactor pulses with the real microphone volume.
@@ -249,14 +524,14 @@ function watchLevel(stream) {
   tick();
 }
 async function onRecordingDone() {
-  setState("thinking"); say("Transcribiendo…");
+  setState("thinking"); say("Transcribing…");
   const blob = new Blob(rec.chunks, { type: rec.media.mimeType || "audio/webm" });
   try {
     const fd = new FormData(); fd.append("audio", blob, "audio.webm");
     const { text, provider } = await api("/transcribe", { method: "POST", body: fd });
-    if (!text) throw new Error("No se entendió el audio. Intenta de nuevo.");
-    if (provider === "mock") logLine("err", "Transcripción simulada (sin credenciales de Google).");
-    await sendCommand(text);
+    if (!text) throw new Error(NOT_UNDERSTOOD);
+    if (provider === "mock") logLine("err", "Simulated transcription (SPEECH_PROVIDER=mock).");
+    if (!(await sendCommand(text))) setState("idle");
   } catch (e) {
     say(e.message, true); logLine("err", e.message); setState("idle");
   }
@@ -266,12 +541,15 @@ async function onRecordingDone() {
 el.btnCam.onclick = toggleCamera;
 el.btnEmotion.onclick = () => analyzeEmotion();
 el.btnMic.onclick = toggleMic;
-el.form.onsubmit = (e) => { e.preventDefault(); sendCommand(el.typed.value); el.typed.value = ""; };
+el.form.onsubmit = async (e) => {
+  e.preventDefault();
+  // The text is kept when the command could not be sent yet.
+  if (await sendCommand(el.typed.value)) el.typed.value = "";
+};
 el.btnMute.onclick = () => {
   state.voice = !state.voice;
   el.btnMute.setAttribute("aria-pressed", String(!state.voice));
-  el.btnMute.textContent = state.voice ? "Voz activada" : "Voz silenciada";
-  if (!state.voice) speechSynthesis?.cancel();
+  el.btnMute.textContent = state.voice ? "Voice on" : "Voice muted";
+  if (!state.voice) { stopSpeaking(); if (document.body.dataset.state === "speaking") setState("idle"); }
 };
-speechSynthesis?.addEventListener?.("voiceschanged", () => {});
 init();

@@ -1,7 +1,17 @@
-"""Map transcribed text to a model (keywords plus fuzzy matching).
+"""Map transcribed text to a model (keyword phrases plus typo tolerance).
 
 Pure functions: they do not know the registry; the orchestrator passes the
 models in.
+
+Matching rules:
+
+- A keyword matches exactly when its words appear in the command as whole
+  words, in order and next to each other ("car price" inside "what is the
+  car price today"). Substrings of longer words never match.
+- Otherwise a keyword matches approximately when every one of its words has
+  a close counterpart, in the same order, so that a speech recognizer's slip
+  ("avocato price") is forgiven but a different topic ("gold price") is not:
+  each word must be similar on its own, and short words must be identical.
 """
 import os
 import re
@@ -11,30 +21,44 @@ from difflib import SequenceMatcher
 
 from ..models.base import BaseModel
 
-# Minimum similarity to accept a fuzzy keyword or wake-word match.
-KEYWORD_THRESHOLD = 0.85
+# Minimum similarity between a keyword word and the word heard in its place.
+WORD_THRESHOLD = 0.85
+# Words up to this length must match exactly: one changed letter in a short
+# word usually makes a different word ("car" / "bar").
+SHORT_WORD = 4
+# Minimum similarity to accept a mangled wake word.
 WAKE_WORD_THRESHOLD = 0.75
+# What speech recognizers write for the "TEC" of "JarvisTEC".
+WAKE_WORD_TAILS = {"tec", "tech", "tek", "teck", "tick", "deck", "tack"}
 
 
 def normalize(text: str) -> str:
     """Lowercase, strip accents and keep only letters, digits and spaces."""
     text = unicodedata.normalize("NFD", text.lower())
     text = "".join(c for c in text if unicodedata.category(c) != "Mn")
-    return re.sub(r"[^a-z0-9 ]+", " ", text).strip()
+    return " ".join(re.sub(r"[^a-z0-9 ]+", " ", text).split())
 
 
 def strip_wake_word(text: str) -> tuple[str, bool]:
     """Remove a leading 'JarvisTEC', tolerating transcription variants.
 
-    Accepts forms such as 'jarvis tec' or 'yarvis tek'. Returns
+    Accepts forms such as 'jarvis tec', 'jarvis tech' or 'yarvis tek', with
+    an optional greeting before it ('hey jarvis'). Returns
     ``(text_without_wake_word, wake_word_found)``.
     """
-    wake_word = normalize(os.getenv("WAKE_WORD", "jarvistec"))
-    normalized = normalize(text)
-    for variant in (wake_word, "jarvis tec", "jarvis"):
-        if normalized.startswith(variant):
-            return normalized[len(variant):].strip(), True
-    words = normalized.split()
+    wake_word = normalize(os.getenv("WAKE_WORD") or "jarvistec")
+    words = normalize(text).split()
+    if words and words[0] in ("hey", "ok", "okay", "hi", "hello"):
+        words = words[1:]
+    if not words:
+        return "", False
+    if words[0] == wake_word:
+        return " ".join(words[1:]), True
+    if words[0] == "jarvis":
+        rest = words[1:]
+        if rest and rest[0] in WAKE_WORD_TAILS:
+            rest = rest[1:]
+        return " ".join(rest), True
     # One or two leading words glued together: "yarvis tek" -> "yarvistek".
     for count in (2, 1):
         if len(words) >= count:
@@ -42,22 +66,37 @@ def strip_wake_word(text: str) -> tuple[str, bool]:
             ratio = SequenceMatcher(None, head, wake_word).ratio()
             if ratio >= WAKE_WORD_THRESHOLD:
                 return " ".join(words[count:]), True
-    return normalized, False
+    return " ".join(words), False
 
 
-def _score(keyword: str, text: str) -> float:
-    normalized_keyword = normalize(keyword)
-    if normalized_keyword and normalized_keyword in text:
-        # Exact containment wins; longer phrases win ties.
-        return 1.0 + len(normalized_keyword) / 100
-    words = text.split()
-    size = len(normalized_keyword.split())
+def _word_similarity(expected: str, heard: str) -> float:
+    if expected == heard:
+        return 1.0
+    if min(len(expected), len(heard)) <= SHORT_WORD:
+        return 0.0
+    return SequenceMatcher(None, expected, heard).ratio()
+
+
+def _score(keyword: str, words: list[str]) -> float:
+    """Score how well ``keyword`` is said somewhere in ``words``."""
+    expected = normalize(keyword).split()
+    size = len(expected)
+    if not expected or size > len(words):
+        return 0.0
     best = 0.0
-    for start in range(max(1, len(words) - size + 1)):
-        window = " ".join(words[start:start + size])
-        ratio = SequenceMatcher(None, normalized_keyword, window).ratio()
-        best = max(best, ratio)
-    return best if best >= KEYWORD_THRESHOLD else 0.0
+    for start in range(len(words) - size + 1):
+        ratios = [
+            _word_similarity(word, heard)
+            for word, heard in zip(expected, words[start:start + size])
+        ]
+        if min(ratios) < WORD_THRESHOLD:
+            continue
+        mean = sum(ratios) / size
+        if mean == 1.0:
+            # Exact phrase: beats any approximate match; longer phrases win.
+            return 1.0 + len(" ".join(expected)) / 100
+        best = max(best, mean)
+    return best
 
 
 def match_command(
@@ -65,10 +104,11 @@ def match_command(
 ) -> tuple[BaseModel | None, float]:
     """Return the best matching model for ``text`` and its score."""
     cleaned, _ = strip_wake_word(text)
+    words = cleaned.split()
     best_model, best_score = None, 0.0
     for model in models:
         for keyword in model.keywords:
-            score = _score(keyword, cleaned)
+            score = _score(keyword, words)
             if score > best_score:
                 best_model, best_score = model, score
     return best_model, best_score

@@ -55,10 +55,23 @@ def health(orchestrator: ModelOrchestrator = Depends(get_orchestrator)):
     }
 
 
+class FrontendFiles(StaticFiles):
+    """Static frontend that browsers revalidate on every load.
+
+    Without this header a browser may keep running an old app.js after the
+    code changes.
+    """
+
+    async def get_response(self, path: str, scope):
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
 FRONTEND_DIR = Path(__file__).resolve().parents[1] / "frontend"
 if (FRONTEND_DIR / "index.html").exists():
     app.mount(
         "/",
-        StaticFiles(directory=FRONTEND_DIR, html=True),
+        FrontendFiles(directory=FRONTEND_DIR, html=True),
         name="frontend",
     )

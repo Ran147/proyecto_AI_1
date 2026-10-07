@@ -150,6 +150,20 @@ body[data-state="listening"] .ring-solid { stroke-width: 3; opacity: 1; }
 .chip { text-align: left; border-color: var(--line); padding: 10px 12px; }
 .chip b { display: block; font: 600 15px/1.2 var(--font-display); letter-spacing: .03em; color: var(--ice); }
 .chip small { display: block; margin-top: 3px; font-weight: 400; font-size: 12px; color: var(--muted); }
+.chip-item { display: grid; grid-template-columns: 1fr auto; gap: 6px; }
+.chip-data { border-color: var(--line); color: var(--muted); padding: 0 10px; font-size: 12px; }
+.chip-data[aria-expanded="true"] { border-color: var(--accent); color: var(--ice); }
+.inputs { grid-column: 1 / -1; display: grid; gap: 8px; padding: 10px; border: 1px solid var(--line); background: #010a10; }
+.inputs[hidden] { display: none; }
+.inputs label { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 2px 8px; align-items: center; font-size: 12px; color: var(--muted); }
+.inputs label span { overflow-wrap: anywhere; color: var(--ice); }
+.inputs label small { grid-column: 1 / -1; font-size: 11px; }
+.inputs input, .inputs select {
+  width: 100%; min-width: 0; padding: 6px 8px; color: var(--ice); font: inherit; font-size: 13px;
+  background: var(--panel); border: 1px solid var(--line);
+}
+.inputs-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.inputs-actions button { flex: 1 1 auto; padding: 9px 10px; font-size: 13px; }
 .log { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; max-height: 300px; overflow: auto; }
 .log li { font-size: 13px; padding-left: 10px; border-left: 2px solid var(--line); }
 .log li.you { border-left-color: var(--muted); color: var(--muted); }

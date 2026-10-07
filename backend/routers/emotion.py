@@ -12,9 +12,9 @@ async def emotion(image: UploadFile = File(...)):
     """Take a frame (JPEG/PNG); return the dominant emotion and scores."""
     data = await image.read()
     if not data:
-        raise HTTPException(422, "La imagen está vacía")
+        raise HTTPException(422, "The image is empty")
     if len(data) > MAX_IMAGE_BYTES:
         raise HTTPException(
-            413, "La imagen es demasiado grande (máximo 8 MB)"
+            413, "The image is too large (8 MB at most)"
         )
     return await detect_emotion(data)

@@ -25,7 +25,7 @@ class EchoInputs(Schema):
 class Echo(BaseModel):
     name = "echo"
     title = "Echo"
-    keywords = ["repite el numero"]
+    keywords = ["repeat the number"]
     input_schema = EchoInputs
     default_input = {"x": 1.0}
 
@@ -33,7 +33,7 @@ class Echo(BaseModel):
         return {"double": inputs["x"] * 2}
 
     def speak(self, result: dict[str, Any]) -> str:
-        return f"El doble es {result['double']}."
+        return f"The double is {result['double']}."
 
 
 class OtherEcho(Echo):
@@ -58,13 +58,17 @@ def make_orchestrator(*classes: type[BaseModel]) -> ModelOrchestrator:
 # ---------- Registration ----------
 def test_default_registry_has_isolated_packages():
     orchestrator = get_orchestrator()
-    assert set(orchestrator.names()) == {"bitcoin", "wine"}
+    assert set(orchestrator.names()) == {
+        "wine", "car_price", "churn", "stroke", "avocado", "bitcoin",
+        "body_fat", "movies", "hepatitis", "cirrhosis",
+    }
     for cls in MODEL_CLASSES:
         # Every model lives in its own package backend.models.<package>.
         assert cls.__module__.startswith("backend.models.")
         assert cls.__module__.count(".") == 3
     demo_flags = {m["name"]: m["demo"] for m in orchestrator.list_models()}
-    assert demo_flags == {"bitcoin": True, "wine": False}
+    # Every registered model is a trained one: no demos remain.
+    assert not any(demo_flags.values())
 
 
 def test_duplicate_name_rejected():
@@ -84,13 +88,15 @@ def test_shared_keyword_rejected():
     class Clash(Echo):
         name = "other"
 
-    with pytest.raises(RegistrationError, match="repite el numero"):
+    with pytest.raises(RegistrationError, match="repeat the number"):
         make_orchestrator(Echo, Clash)
 
 
 def test_input_fields_derived_from_schema():
     info = get_orchestrator().describe("bitcoin")
-    assert info["input_fields"] == {"last_price": "float, last price in USD"}
+    assert info["input_fields"]["last_price"].startswith(
+        "float, latest known daily close in USD"
+    )
 
 
 # ---------- Execution ----------
@@ -99,7 +105,7 @@ def test_predict_merges_defaults_and_validates():
     assert orchestrator.predict("echo")["result"] == {"double": 2.0}
     output = orchestrator.predict("echo", {"x": "4"})
     assert output["inputs"] == {"x": 4.0}
-    assert output["message"] == "El doble es 8.0."
+    assert output["message"] == "The double is 8.0."
 
 
 def test_predict_invalid_input():
@@ -114,7 +120,7 @@ def test_predict_unknown_model():
 
 def test_command_executes_matched_model():
     output = make_orchestrator(Echo, Broken).handle_command(
-        "JarvisTEC repite el numero", {"x": 3}
+        "JarvisTEC repeat the number", {"x": 3}
     )
     assert output["matched"]
     assert output["wake_word"]
@@ -123,9 +129,9 @@ def test_command_executes_matched_model():
 
 
 def test_command_without_match_lists_examples():
-    output = make_orchestrator(Echo).handle_command("cuéntame un chiste")
+    output = make_orchestrator(Echo).handle_command("tell me a joke")
     assert output["matched"] is False
-    assert "repite el numero" in output["message"]
+    assert "repeat the number" in output["message"]
 
 
 # ---------- API through the orchestrator ----------
@@ -145,7 +151,7 @@ def test_api_goes_through_orchestrator(api):
     response = api.post("/models/echo/predict", json={"inputs": {"x": 5}})
     assert response.json()["result"] == {"double": 10.0}
     response = api.post(
-        "/command", json={"text": "Jarvis tec repite el numero"}
+        "/command", json={"text": "Jarvis tec repeat the number"}
     )
     assert response.json()["model"] == "echo"
 
@@ -156,11 +162,11 @@ def test_api_errors(api):
 
     response = api.post("/models/echo/predict", json={"inputs": {"x": "a"}})
     assert response.status_code == 422
-    assert "Entradas inválidas" in response.json()["detail"]
+    assert "Invalid inputs" in response.json()["detail"]
 
     response = api.post("/models/broken/predict", json={})
     assert response.status_code == 503
-    assert "no está disponible" in response.json()["detail"]
+    assert "is not available" in response.json()["detail"]
 
     response = api.post("/command", json={"text": "JarvisTEC modelo roto"})
     assert response.status_code == 503

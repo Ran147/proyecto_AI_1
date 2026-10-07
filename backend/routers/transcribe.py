@@ -13,9 +13,9 @@ async def transcribe(audio: UploadFile = File(...)):
     """Take audio (webm/ogg/wav) and return the transcribed text."""
     data = await audio.read()
     if not data:
-        raise HTTPException(422, "El audio está vacío")
+        raise HTTPException(422, "The audio is empty")
     if len(data) > MAX_AUDIO_BYTES:
         raise HTTPException(
-            413, "El audio es demasiado largo (máximo ~1 minuto)"
+            413, "The audio is too long (about 1 minute at most)"
         )
     return await run_transcription(data, audio.content_type or "")

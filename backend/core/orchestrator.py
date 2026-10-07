@@ -4,8 +4,8 @@ Routers and services never access the registry or call ``predict()``
 directly; they ask the orchestrator to list, describe, run or route a
 command. Lazy loading, input validation and the response format live here.
 
-The ``message`` field and the error messages are Spanish because the
-frontend shows them verbatim to the end user.
+The ``message`` field and the error messages are written for the end
+user: the frontend shows them verbatim.
 """
 import logging
 from functools import lru_cache
@@ -81,10 +81,19 @@ class ModelOrchestrator:
         return (model.name if model else None), score
 
     def handle_command(
-        self, text: str, inputs: dict[str, Any] | None = None
+        self,
+        text: str,
+        inputs: dict[str, Any] | None = None,
+        inputs_by_model: dict[str, dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
-        """Route a transcribed command to a model and run it."""
-        _, had_wake_word = strip_wake_word(text)
+        """Route a transcribed command to a model and run it.
+
+        The caller does not know which model a spoken command will reach, so
+        it may send ``inputs_by_model`` (``{model name: inputs}``); only the
+        entry of the matched model is used. Values said in the command itself
+        override it, and ``inputs`` wins over both.
+        """
+        cleaned, had_wake_word = strip_wake_word(text)
         model, score = match_command(text, self._registry)
         if model is None:
             examples = ", ".join(
@@ -93,9 +102,16 @@ class ModelOrchestrator:
             return {
                 "matched": False,
                 "wake_word": had_wake_word,
-                "message": "No entendí el comando. Prueba con: " + examples,
+                "message": (
+                    "I did not understand the command. Try: " + examples
+                ),
             }
-        output = self._run(model, inputs)
+        merged = {
+            **(inputs_by_model or {}).get(model.name, {}),
+            **model.inputs_from_command(cleaned),
+            **(inputs or {}),
+        }
+        output = self._run(model, merged)
         return {
             "matched": True,
             "wake_word": had_wake_word,
@@ -106,7 +122,7 @@ class ModelOrchestrator:
     def _get(self, name: str) -> BaseModel:
         model = self._registry.get(name)
         if model is None:
-            raise ModelNotFoundError(f"Modelo '{name}' no existe")
+            raise ModelNotFoundError(f"Model '{name}' does not exist")
         return model
 
     def _run(
@@ -119,12 +135,12 @@ class ModelOrchestrator:
         except Exception as exc:
             logger.exception("Could not load model '%s'", model.name)
             raise ModelUnavailableError(
-                f"El modelo '{model.name}' no está disponible: {exc}"
+                f"The model '{model.name}' is not available: {exc}"
             ) from exc
         try:
             result = model.predict(data)
-        except (KeyError, ValueError, TypeError) as exc:
-            raise InvalidInputError(f"Entradas inválidas: {exc}") from exc
+        except (KeyError, ValueError, TypeError, OverflowError) as exc:
+            raise InvalidInputError(f"Invalid inputs: {exc}") from exc
         return {
             "model": model.name,
             "inputs": data,
@@ -144,7 +160,7 @@ class ModelOrchestrator:
                 f"{err['msg']}"
                 for err in exc.errors()
             )
-            raise InvalidInputError(f"Entradas inválidas: {detail}") from exc
+            raise InvalidInputError(f"Invalid inputs: {detail}") from exc
 
 
 @lru_cache(maxsize=None)

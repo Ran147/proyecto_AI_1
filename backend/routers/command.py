@@ -14,6 +14,8 @@ class CommandRequest(Schema):
 
     text: str
     inputs: dict[str, Any] = {}
+    # Inputs per model name; the matched model's entry is applied.
+    inputs_by_model: dict[str, dict[str, Any]] = {}
 
 
 @router.post("/command")
@@ -22,4 +24,6 @@ def command(
     orchestrator: ModelOrchestrator = Depends(get_orchestrator),
 ):
     """Route transcribed text to the matching model and run it."""
-    return orchestrator.handle_command(body.text, body.inputs)
+    return orchestrator.handle_command(
+        body.text, body.inputs, body.inputs_by_model
+    )

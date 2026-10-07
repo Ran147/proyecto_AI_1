@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -14,31 +14,31 @@
   <header class="bar">
     <h1>JarvisTEC</h1>
     <div class="bar-right">
-      <span class="api" id="apiStatus" role="status"><i></i><span>Conectando…</span></span>
-      <button class="ghost" id="btnMute" aria-pressed="false">Voz activada</button>
+      <span class="api" id="apiStatus" role="status"><i></i><span>Connecting…</span></span>
+      <button class="ghost" id="btnMute" aria-pressed="false">Voice on</button>
     </div>
   </header>
 
   <main class="hud">
 
     <section class="panel cam" aria-labelledby="camTitle">
-      <h2 id="camTitle">Cámara</h2>
+      <h2 id="camTitle">Camera</h2>
       <div class="video-wrap">
         <video id="video" autoplay playsinline muted></video>
-        <p class="video-empty" id="videoEmpty">La cámara está apagada</p>
+        <p class="video-empty">The camera is off</p>
       </div>
       <div class="row">
-        <button id="btnCam">Encender cámara</button>
-        <button id="btnEmotion" disabled>Analizar emoción</button>
+        <button id="btnCam">Turn camera on</button>
+        <button id="btnEmotion" disabled>Analyze emotion</button>
       </div>
       <div class="emotion" aria-live="polite">
-        <p class="emotion-label" id="emotionLabel">Sin analizar</p>
-        <p class="emotion-note" id="emotionNote">Enciende la cámara para que JarvisTEC lea tu expresión.</p>
+        <p class="emotion-label" id="emotionLabel">Not analyzed</p>
+        <p class="emotion-note" id="emotionNote">Turn the camera on so JarvisTEC can read your expression.</p>
         <div id="emotionBars" class="bars"></div>
       </div>
     </section>
 
-    <section class="core" aria-label="Asistente">
+    <section class="core" aria-label="Assistant">
       <div class="reactor" id="reactor" aria-hidden="true">
         <svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
           <defs>
@@ -57,31 +57,31 @@
         </svg>
       </div>
 
-      <p class="status" id="status" role="status">En espera</p>
-      <div class="response" id="response" aria-live="polite">Presiona el micrófono y di «JarvisTEC, precio del bitcoin».</div>
+      <p class="status" id="status" role="status">Standing by</p>
+      <div class="response" id="response" aria-live="polite">Press the microphone and say "JarvisTEC, wine quality", or pick a command from the list.</div>
       <details class="raw" id="raw" hidden>
-        <summary>Ver respuesta de la API</summary>
+        <summary>Show the API response</summary>
         <pre id="rawJson"></pre>
       </details>
 
       <div class="controls">
         <button class="mic" id="btnMic" aria-pressed="false">
-          <span class="mic-dot"></span><span id="micText">Hablar</span>
+          <span class="mic-dot"></span><span id="micText">Speak</span>
         </button>
       </div>
 
       <form class="typed" id="typedForm" autocomplete="off">
-        <label for="typed" class="sr">Escribir un comando</label>
-        <input id="typed" type="text" placeholder="O escribe un comando: JarvisTEC, calidad del vino">
-        <button type="submit">Enviar</button>
+        <label for="typed" class="sr">Type a command</label>
+        <input id="typed" type="text" placeholder="Or type a command: JarvisTEC, wine quality">
+        <button type="submit">Send</button>
       </form>
     </section>
 
-    <aside class="panel side" aria-label="Comandos y conversación">
-      <h2>Comandos disponibles</h2>
-      <div class="chips" id="commands"><p class="muted">Cargando…</p></div>
-      <h2>Conversación</h2>
-      <ul class="log" id="log"><li class="muted">Aún no hay mensajes.</li></ul>
+    <aside class="panel side" aria-label="Commands and conversation">
+      <h2>Available commands</h2>
+      <div class="chips" id="commands"><p class="muted">Loading…</p></div>
+      <h2>Conversation</h2>
+      <ul class="log" id="log"><li class="muted">No messages yet.</li></ul>
     </aside>
 
   </main>
