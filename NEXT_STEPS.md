@@ -1,286 +1,59 @@
-# JarvisTEC - Next Steps: ML Models
+# JarvisTEC - Status and remaining steps
 
-Roadmap for building the 10 ML models **one at a time**, in the order below.
+The build plan this file used to hold is finished: the ten models are
+trained, integrated and tested. What changed and why is in
+[docs/CHANGES.md](docs/CHANGES.md); the requirements and their status are in
+[docs/PROJECT.md](docs/PROJECT.md).
 
-> **Rule:** do not start the next model until every box in the current
-> model's checklist is ticked. A model that is "almost done" does not count.
-> The goal is 10 finished models, not 10 half-finished ones.
-
-How-to references: [docs/ADDING_A_MODEL.md](docs/ADDING_A_MODEL.md) and
-[training/README.md](training/README.md). Course requirements and overall
-status: [docs/PROJECT.md](docs/PROJECT.md).
-
-## Progress
+## Models
 
 | # | Model | Backend `name` | Task | Status |
 |---|---|---|---|---|
-| 0 | Environment setup | - | - | Done |
-| 1 | Wine quality | `wine` | Classification | In progress (team review pending) |
-| 2 | Car price | `car_price` | Regression | Not started |
-| 3 | Telco customer churn | `churn` | Classification | Not started |
-| 4 | Stroke risk | `stroke` | Classification | Not started |
-| 5 | Avocado price | `avocado` | Time series | Not started |
-| 6 | Bitcoin price | `bitcoin` | Time series | Not started (demo in place) |
-| 7 | Body fat | `body_fat` | Regression | Not started |
-| 8 | Movie recommendation | `movies` | Recommendation | Not started |
-| 9 | Hepatitis C | `hepatitis` | Classification | Not started |
-| 10 | Cirrhosis | `cirrhosis` | Classification | Not started |
+| 1 | Wine quality | `wine` | Classification | Done |
+| 2 | Car price | `car_price` | Regression | Done |
+| 3 | Telco customer churn | `churn` | Classification | Done |
+| 4 | Stroke risk | `stroke` | Classification | Done |
+| 5 | Avocado price | `avocado` | Time series | Done |
+| 6 | Bitcoin price | `bitcoin` | Time series | Done |
+| 7 | Body fat | `body_fat` | Regression | Done |
+| 8 | Movie recommendation | `movies` | Recommendation | Done |
+| 9 | Hepatitis C | `hepatitis` | Classification | Done |
+| 10 | Cirrhosis | `cirrhosis` | Classification | Done |
 
-Status values: Not started, In progress, Done (all boxes ticked).
+"Done" means, for every model:
 
-The backend `name` values are proposals. They must be lowercase English with
-no spaces, because they appear in `/models/{name}`. Once a model ships, keep
-its name: changing it breaks the API route.
+- `training/<name>/notebook.ipynb` executed, with the six rubric sections
+  and the analysis written from its own outputs;
+- `artifacts/<name>.joblib` and `.meta.json` committed, and reproduced by
+  re-running the notebook (fixed seed);
+- `training/<name>/README.md` model card with the real test metrics;
+- `backend/models/<name>/` adapter and input schema, registered in
+  `MODEL_CLASSES`;
+- `tests/models/test_<name>.py` passing: default prediction, invalid input
+  (422), missing artifact (503), every voice command;
+- checked against a running server: `POST /models/<name>/predict`,
+  `POST /command` and the command button with its data form.
 
-## Workflow for every model
+## Before the delivery
 
-1. **Dataset:** download it into `data/<dataset>/` (git-ignored). Record the
-   source URL and license.
-2. **Training:** copy `training/_template/` to `training/<name>/` and fill in
-   the notebook's **Configuration** cell.
-3. **Run the notebook** top to bottom and write the analysis text for all 6
-   rubric sections.
-4. **Artifacts:** the export cell writes `artifacts/<name>.joblib` and
-   `<name>.meta.json`.
-5. **Model card:** copy the real test metrics from `meta.json` into
-   `training/<name>/README.md`. Never write numbers that did not come from a
-   run.
-6. **Inference package:** create `backend/models/<name>/` with
-   `__init__.py`, `schema.py` and `adapter.py`.
-7. **Register:** add the class to `MODEL_CLASSES` in
-   `backend/models/__init__.py`. If it replaces a demo, remove the demo from
-   the list and delete its package.
-8. **Test:** add `tests/models/test_<name>.py`, then run the full suite.
-9. **Try it end to end:** run the model through `/models/<name>/predict`,
-   `/command` and the frontend.
-10. **Document:** write the Overleaf section and add the references.
+- [ ] Upload `docs/report/` to Overleaf and add the screenshots (the only
+      items still marked `[PENDING]` in the report).
+- [ ] Each team member reads the ten notebooks; anyone may be asked to
+      defend any decision.
+- [ ] Open every DOI in the report's bibliography once.
+- [ ] Confirm the delivery format with the professor.
 
-## Definition of Done (copy into each model section)
+## Rules worth keeping
 
-- [ ] Dataset in `data/`; source, license and shape recorded in
-      `training/<name>/README.md`
-- [ ] Notebook sections complete, no **TODO** left:
-  - Problem analysis
-  - Data understanding
-  - Data exploration
-  - Model
-  - Evaluation
-  - Conclusion
-- [ ] Evaluation uses a held-out test set and task-appropriate metrics. For
-      time series, use a chronological split.
-- [ ] `artifacts/<name>.joblib` and `.meta.json` generated by the notebook;
-      real metrics copied to the model card
-- [ ] Reproducible: another teammate regenerates the artifact from a clean
-      clone by following the model card
-- [ ] `backend/models/<name>/` exists with `schema.py`, `adapter.py` and
-      `__init__.py`:
-  - `schema.py` lists the real features.
-  - `default_input` comes from `meta.json`.
-  - `is_demo = False`.
-- [ ] Registered in `MODEL_CLASSES`; any demo it replaces has been removed
-- [ ] `tests/models/test_<name>.py` checks:
-  - A prediction with `default_input` returns JSON-serializable output.
-  - Invalid input returns 422.
-  - A voice command routes to this model.
-  - Model-running tests are skipped with `pytest.mark.skipif` when the
-    artifact is missing.
-- [ ] `python -m pytest` passes, and existing tests were updated where the
-      model changed behavior
-- [ ] 2-3 natural Spanish voice phrases in `keywords`; `speak()` returns a
-      readable Spanish sentence
-- [ ] Manually verified:
-  - `POST /models/<name>/predict` works.
-  - `POST /command` with `"JarvisTEC <phrase>"` works.
-  - The command chip appears in the frontend and returns the answer.
-- [ ] 1-2 scientific papers selected; Overleaf section written
-
----
-
-## 0. Environment setup
-
-- [x] Create a virtual env and run `pip install -r requirements.txt`
-      (includes `matplotlib` and `ipykernel` for the notebooks)
-- [x] `python -m pytest` passes
-- [x] `uvicorn backend.main:app --reload` starts, and `/health` lists the
-      registered models
-- [x] Open `training/_template/notebook.ipynb` in Jupyter or VS Code and
-      confirm the kernel starts
-
-## 1. Wine quality - `wine`
-
-- **Dataset:** Kaggle `rajyellow46/wine-quality` ->
-  `data/wine_quality/winequalityN.csv`
-- **Task:** 3-class classification. The raw `quality` score is grouped into
-  `low` (3-5), `medium` (6) and `high` (7-9), because the scores 3, 8 and 9
-  have too few samples to learn on their own.
-- **Result (test set, from `artifacts/wine.meta.json`):** Random Forest with
-  `class_weight="balanced"`.
-  - Macro F1 0.590 and accuracy 0.591.
-  - The majority-class baseline gets macro F1 0.203.
-  - Full details are in `training/wine/README.md`.
-- **Demo replaced:** the wine demo was deleted, and the tests that assumed it
-  were updated.
-- **Pattern set for the next nine models:**
-  - `tests/models/test_wine.py`: tests that run the model are skipped when the
-    artifact is missing.
-  - The notebook adds its own cells: snake_case column names, a derived
-    target, and correlation against the raw score.
-- **Lessons for the next models:**
-  - The orchestrator validates inputs *before* loading the model.
-  - Set `n_jobs=1` on loaded models, since each request predicts a single
-    row.
-  - The artifact is about 50 MB, so the first request takes about 3 s while
-    it loads; later requests take about 30 ms.
-  - `meta.json` records `sklearn_version`: load the model with the same
-    scikit-learn version.
-
-Definition of Done:
-
-- [x] Dataset in `data/`; source, license and shape recorded in
-      `training/wine/README.md`. **Check the license shown on the Kaggle
-      page.**
-- [x] Notebook sections complete, no **TODO** left. **The analysis text is a
-      draft: the team must review it and fill in the members' names.**
-- [x] Evaluation on a held-out, stratified test set, deduplicated before the
-      split; macro F1, per-class report and confusion matrix
-- [x] `artifacts/wine.joblib` and `.meta.json` generated by the notebook; real
-      metrics copied to the model card
-- [ ] Reproducible: another teammate regenerates the artifact from a clean
-      clone by following the model card
-- [x] `backend/models/wine/` with `schema.py` (12 real features, with units),
-      `adapter.py` and `__init__.py`; `default_input` from `meta.json`;
-      `is_demo = False`
-- [x] Registered in `MODEL_CLASSES`; the wine demo removed
-- [x] `tests/models/test_wine.py`: serializable prediction, 422 on invalid
-      input, 503 without artifact, voice commands; skipped without artifact
-- [x] `python -m pytest` passes with and without the artifact
-- [x] Voice phrases: "calidad del vino", "clasificar vino", "qué tan bueno es
-      este vino"; `speak()` answers in Spanish with the probability
-- [ ] Manually verified:
-  - [x] `POST /models/wine/predict` works against a running server.
-  - [x] `POST /command` works against a running server.
-  - [x] `/models` exposes the "calidad del vino" chip.
-  - [ ] **Clicking the chip in a browser still has to be done.**
-- [ ] Overleaf section written. The 5 references are already listed in the
-      notebook's section 6.
-- [ ] Definition of Done complete
-
-## 2. Car price - `car_price`
-
-- **Dataset:** GitHub `amankharwal/Website-data` -> `car data.csv`
-- **Task:** regression of the selling price
-- **Notes:** categorical columns such as fuel type and transmission need
-  encoding inside the pipeline. The schema should accept their category
-  labels, not encoded values.
-- [ ] Definition of Done complete
-
-## 3. Telco customer churn - `churn`
-
-- **Dataset:** GitHub `IBM/telco-customer-churn-on-icp4d`
-- **Task:** binary classification (churn yes/no)
-- **Notes:**
-  - Check for numeric columns stored as text, and drop the customer ID column
-    (`EXCLUDED_COLUMNS`).
-  - Report precision, recall and F1, not only accuracy.
-  - The schema has many fields; keep `default_input` complete so voice
-    commands still work.
-- [ ] Definition of Done complete
-
-## 4. Stroke risk - `stroke`
-
-- **Dataset:** Kaggle `fedesoriano/stroke-prediction-dataset`
-- **Task:** binary classification
-- **Notes:**
-  - Check the class balance during EDA. If the positive class is rare,
-    accuracy is misleading: use recall, F1, ROC-AUC and a confusion matrix,
-    and consider class weights.
-  - Handle missing values in the pipeline and exclude the ID column.
-  - Phrase `speak()` as an estimate, not a diagnosis.
-- [ ] Definition of Done complete
-
-## 5. Avocado price - `avocado`
-
-- **Dataset:** Kaggle `neuromusic/avocado-prices`
-- **Task:** time-series forecasting of the average price
-- **Notes:**
-  - Set `IS_TIME_SERIES = True` and `DATE_COLUMN`, which gives a
-    chronological split.
-  - Add lag features in section 4.
-  - Decide the forecast scope (e.g. one region/type or aggregated) and state
-    it.
-- **Before starting:** this is the first time-series model, so first decide
-  how the adapter gets recent history at prediction time. Options: inputs, a
-  snapshot saved in `meta.json`, or a small file in `artifacts/`. Reuse the
-  same decision for Bitcoin.
-- [ ] Definition of Done complete
-
-## 6. Bitcoin price - `bitcoin`
-
-- **Dataset:** Kaggle `team-ai/bitcoin-price-prediction`
-- **Task:** time-series forecasting ("price for tomorrow")
-- **Replaces:** `backend/models/demo_bitcoin/`. Delete it in the same change.
-  After this model, no demos remain.
-- **Notes:**
-  - Reuse the lag and history approach from the avocado model.
-  - Keep the phrases `"precio del bitcoin"` and `"precio de bitcoin para
-    mañana"`: the speech-hint and command tests use them.
-  - Compare against a naive baseline (tomorrow = today) in the evaluation.
-- **Tests to update:** those that still assume the demo's +1% behavior
-  (`test_predict_direct`, `test_input_fields_derived_from_schema`,
-  `test_default_registry_has_isolated_packages`).
-- [ ] Definition of Done complete
-
-## 7. Body fat - `body_fat`
-
-- **Dataset:** Kaggle `fedesoriano/body-fat-prediction-dataset`
-- **Task:** regression of the body fat percentage
-- **Notes:**
-  - Check whether any column is derived from the target (e.g. density) and
-    would leak it. Justify keeping or excluding it.
-  - Use clear units in the schema field descriptions.
-- [ ] Definition of Done complete
-
-## 8. Movie recommendation - `movies`
-
-- **Dataset:** the Google Drive movie dataset linked in the assignment
-- **Task:** recommendation
-- **Notes:**
-  - The notebook template does not fit this case, because it is not classic
-    supervised learning. Adapt sections 4 (e.g. content-based similarity or
-    collaborative filtering) and 5 (ranking metrics or a qualitative
-    evaluation, justified in the text).
-  - The artifact may not be a scikit-learn `Pipeline` (e.g. a similarity
-    matrix plus an index), so `load()` and `predict()` will look different.
-  - The input schema is likely a movie title or user ID, and `default_input`
-    needs a title that exists in the data.
-- [ ] Definition of Done complete
-
-## 9. Hepatitis C - `hepatitis`
-
-- **Dataset:** Kaggle `fedesoriano/hepatitis-c-dataset`
-- **Task:** multiclass classification (patient category)
-- **Notes:**
-  - Check the class balance.
-  - Report per-class metrics and a confusion matrix.
-  - Handle missing lab values in the pipeline.
-  - Phrase `speak()` as an estimate, not a diagnosis.
-- [ ] Definition of Done complete
-
-## 10. Cirrhosis - `cirrhosis`
-
-- **Dataset:** Kaggle `fedesoriano/cirrhosis-prediction-dataset`
-- **Task:** classification of the cirrhosis stage
-- **Notes:**
-  - Check for missing values and how they are distributed across columns.
-  - Choose and justify which outcome is predicted.
-  - Exclude ID and time-to-event columns if they would leak the target.
-- [ ] Definition of Done complete
-
----
-
-## Out of scope for this file
-
-Emotion recognition and speech-to-text are separate tracks (local models, with
-the Google code removed). They are tracked in
-[docs/PROJECT.md](docs/PROJECT.md), sections R2 and R3, and do not block the
-ML model queue.
+- Never write a metric that did not come from a run; the model card copies
+  `meta.json`.
+- All preprocessing that can live inside the scikit-learn `Pipeline` does, so
+  the backend receives raw values. The time-series models build their lag
+  features in one function that is identical in the notebook and the
+  adapter.
+- A model is compared with a baseline on the same test set, and a result
+  that does not beat the baseline is reported as such.
+- Model `name`s are part of the API routes: do not rename them.
+- Voice phrases must be unique across models and contain the topic word;
+  `tests/test_routing.py` checks the whole set, including phrases that must
+  match nothing.

@@ -2,46 +2,99 @@
 
 Voice and vision personal assistant that recognizes the user's emotion and
 runs machine learning models from spoken commands. Group project for the
-Artificial Intelligence course, Instituto Tecnológico de Costa Rica.
+Artificial Intelligence course (IC-6200), Instituto Tecnológico de Costa Rica.
+
+Team: Anthony Jafeth Arias Robleto, Randy Espinoza Downing, Kenneth Jhoan
+Araya Arguedas.
 
 ## Quick start
 
-Run every command from the repository root.
+Run every command from the repository root. Tested with Python 3.14.
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env             # optional: GOOGLE_API_KEY, see docs/GOOGLE_SETUP.md
 uvicorn backend.main:app --reload
 ```
 
-- Web interface: http://localhost:8000/
+- Web interface: http://localhost:8000/ (use Chrome or Edge for voice)
 - Interactive API documentation (Swagger): http://localhost:8000/docs
 - Status and registered models: http://localhost:8000/health
 
-Without `GOOGLE_API_KEY`, `/emotion` and `/transcribe` run in mock mode.
+That is all: the ten trained models and the emotion networks are committed in
+`artifacts/`, and no API key is needed.
+
+- **Voice** is transcribed by the browser's own speech recognition (Web Speech
+  API, Chrome or Edge, internet connection required). Only the text reaches
+  the backend.
+- **Emotion** runs on a local model in the backend: the YuNet face detector,
+  then the FER+ and HSEmotion expression classifiers averaged, through OpenCV.
+- With `GOOGLE_API_KEY` in `.env` (copy `.env.example`), both switch to the
+  Google Cloud APIs; see [docs/GOOGLE_SETUP.md](docs/GOOGLE_SETUP.md).
+
+## Using it
+
+Say or type a command that starts with "JarvisTEC" (or "Jarvis"), or click one
+in the list. Everything is in English.
+
+| Model | Main command | Also understands |
+|---|---|---|
+| `wine` | JarvisTEC, wine quality | how good is this wine; classify wine |
+| `car_price` | JarvisTEC, car price | how much is my car worth; used car price |
+| `churn` | JarvisTEC, customer churn | will the customer leave |
+| `stroke` | JarvisTEC, stroke risk | risk of a stroke |
+| `avocado` | JarvisTEC, avocado price | avocado forecast; price of avocados |
+| `bitcoin` | JarvisTEC, bitcoin price | bitcoin price tomorrow |
+| `body_fat` | JarvisTEC, body fat | how much body fat do I have |
+| `movies` | JarvisTEC, recommend a movie | what movie should I watch |
+| `hepatitis` | JarvisTEC, hepatitis type | classify hepatitis |
+| `cirrhosis` | JarvisTEC, cirrhosis stage | type of cirrhosis |
+
+- A command without data answers for an example case. The **Data** button
+  next to each command opens a form with the model's inputs; edited values
+  also apply to later spoken or typed commands.
+- Three commands take data in the sentence: "red wine quality", "organic
+  avocado price", "recommend me a movie like Jurassic Park".
+- The percentage in an answer is the model's estimate for that case, not the
+  model's accuracy. The accuracy of each model is in its notebook and model
+  card.
 
 ## API
 
 | Method | Path | Description |
 |---|---|---|
 | GET | `/health` | API status, registered models and active providers |
-| GET | `/models` | Metadata of every model |
+| GET | `/models` | Metadata of every model: inputs, allowed values, defaults, commands |
 | GET | `/models/{name}` | Metadata of one model |
-| POST | `/models/{name}/predict` | Run a model. Body: `{"inputs": {...}}` |
-| POST | `/command` | Transcribed text to the right model. Body: `{"text": "JarvisTEC calidad del vino"}` |
+| POST | `/models/{name}/predict` | Run a model. Body: `{"inputs": {...}}`; missing inputs take defaults |
+| POST | `/command` | Text to the right model. Body: `{"text": "JarvisTEC wine quality"}` |
 | POST | `/emotion` | Image (field `image`) to dominant emotion and scores |
-| POST | `/transcribe` | Audio (field `audio`) to transcribed text |
+| POST | `/transcribe` | Audio (field `audio`) to text; needs a server speech provider (Google) |
+
+Without a Google key `POST /transcribe` answers 503 and explains that the web
+interface transcribes in the browser; it never returns an invented text.
 
 ## Models
 
-| Name | Task | Status |
-|---|---|---|
-| `wine` | Wine quality classification (low / medium / high) | Trained; see [training/wine/README.md](training/wine/README.md) |
-| `bitcoin` | Bitcoin price | Demo, not trained (`"demo": true` in `GET /models`) |
+| Name | Task | Model | Test result (baseline) |
+|---|---|---|---|
+| `wine` | Wine quality: low / medium / high | Random forest | Macro F1 0.59 (0.20) |
+| `car_price` | Used car resale price | Gradient boosting on the log price | R2 0.88; RMSE 1.79 lakh (5.08) |
+| `churn` | Telecom customer churn | Gradient boosting, tuned threshold | Churn F1 0.63, ROC-AUC 0.85 (F1 0) |
+| `stroke` | Stroke risk | Random forest, tuned threshold | ROC-AUC 0.83, recall 0.70 (0.50) |
+| `avocado` | Avocado price next week | Ridge on lagged prices | RMSE 0.079 USD national series (naive 0.076) |
+| `bitcoin` | Bitcoin close next day | Random forest on log returns | RMSE 69.98 USD (naive 69.73) |
+| `body_fat` | Body fat percentage | Ridge, two measurements | R2 0.67; RMSE 4.27 points (7.45) |
+| `movies` | Movie recommendation | Item-based collaborative filtering | NDCG@10 0.140 with one seed (popularity 0.165) |
+| `hepatitis` | Hepatitis C category | Random forest, balanced | Macro F1 0.59 (0.23) |
+| `cirrhosis` | Cirrhosis stage 1-4 | Random forest, balanced | Accuracy 0.51 (0.37) |
 
-The full roadmap is in [NEXT_STEPS.md](NEXT_STEPS.md).
+Each model has a notebook with the six sections of the grading rubric
+(`training/<name>/notebook.ipynb`) and a model card
+(`training/<name>/README.md`). The results are reported next to their
+baseline, including the cases where the model does not beat it (`bitcoin`,
+`avocado` on the national series, `movies` with a single seed movie).
 
 ## Project structure
 
@@ -59,34 +112,39 @@ backend/
 frontend/               HTML, CSS and JavaScript interface
 training/               offline training; never imported by the backend
   _template/            notebook with the 6 rubric sections + model card template
-  <name>/               one folder per trained model
-tests/                  pytest suite; tests/models/ has one file per trained model
-artifacts/              trained models (.joblib + .meta.json); git-ignored
-data/                   datasets; git-ignored
-docs/                   project documentation
+  <name>/               notebook and model card of each model
+artifacts/              trained models (.joblib + .meta.json) and emotion networks (.onnx)
+scripts/                dataset and model downloads, emotion evaluation, timing
+tests/                  pytest suite; tests/models/ has one file per model
+data/                   datasets; git-ignored (scripts/download_datasets.py)
+docs/                   project documentation and the written report (docs/report/)
 ```
-
-## Language policy
-
-Code, identifiers, API names, JSON keys, comments and documentation are in
-English. Text shown to or spoken to the end user stays in Spanish: interface
-labels, voice command phrases, model display titles, the `message` field and
-the error `detail` messages, because the frontend shows them verbatim.
 
 ## Development
 
 ```bash
-python -m pytest                     # tests
-pip install ruff && ruff check .     # PEP 8 lint (79-character lines)
+python -m pytest                     # 300+ tests
+pip install ruff && ruff check backend tests scripts   # PEP 8 lint (79 columns)
 ```
 
-Tests that need a trained artifact are skipped when it is missing; generate it
-by running the model's notebook in `training/<name>/`.
+To retrain a model, download the data and run its notebook; it rewrites the
+files in `artifacts/`. Run one notebook at a time: several at once can
+exhaust the memory.
+
+```bash
+python scripts/download_datasets.py
+jupyter nbconvert --to notebook --execute --inplace training/wine/notebook.ipynb
+```
+
+Other scripts: `scripts/download_emotion_models.py` (re-fetches the emotion
+networks, with hash check), `scripts/evaluate_emotion_model.py` (emotion
+classifiers on FER-2013), `scripts/measure_response_times.py`.
 
 ## Documentation
 
+- [docs/CHANGES.md](docs/CHANGES.md): what changed in the last big update, for the team
 - [docs/PROJECT.md](docs/PROJECT.md): course requirements, grading and project status
-- [NEXT_STEPS.md](NEXT_STEPS.md): model-by-model work plan and definition of done
+- [docs/report/main.tex](docs/report/main.tex): the written report (Overleaf source)
 - [docs/ADDING_A_MODEL.md](docs/ADDING_A_MODEL.md): how to train and integrate a model
-- [docs/GOOGLE_SETUP.md](docs/GOOGLE_SETUP.md): temporary Google Cloud setup for vision and voice
+- [docs/GOOGLE_SETUP.md](docs/GOOGLE_SETUP.md): optional Google Cloud setup for vision and voice
 - [docs/course_project_specification.pdf](docs/course_project_specification.pdf): original assignment (Spanish)

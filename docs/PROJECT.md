@@ -13,7 +13,8 @@ this document is an English summary of it. The model-by-model work plan is in
 
 JarvisTEC is a personal assistant driven by voice and image. It reads the
 user's face and voice, interprets natural-language machine learning commands
-(e.g. "JarvisTEC, tipo de cambio para mañana") and answers by running the
+(the assignment's example is "JarvisTEC, tipo de cambio para mañana"; this
+project's commands are in English, e.g. "JarvisTEC, bitcoin price") and answers by running the
 corresponding model. The assistant needs no real face: an animation, image or
 audio effect may represent it.
 
@@ -51,9 +52,14 @@ organization):
 
 **External APIs (R2, R3).** The course allows Google or Azure APIs for
 emotions and speech-to-text in the week-10 delivery only; the assignment notes
-mention Azure Face and Speech-to-Text. **Project decision:** emotion
-recognition and speech-to-text will run on local models. The current Google
-integration is temporary and will be removed once the local models work.
+mention Azure Face and Speech-to-Text. **Project decision:** speech-to-text
+uses the speech recognition built into Chrome and Edge (Web Speech API, served
+by Google's speech service), which needs no API key or billing account. The
+Google Cloud Speech-to-Text and Vision providers remain in the backend and
+take over when `GOOGLE_API_KEY` is set ([GOOGLE_SETUP.md](GOOGLE_SETUP.md)).
+Emotion recognition runs on a local model in the backend (YuNet face
+detector, then the FER+ and HSEmotion expression classifiers averaged; all
+pretrained and run with OpenCV), which also needs no key.
 
 ## 4. Grading
 
@@ -81,16 +87,22 @@ by scientific papers. Required sections:
 
 ## 6. Status
 
+Everything below is implemented, tested and committed, including the trained
+models. The history of the last big update is in [CHANGES.md](CHANGES.md).
+
 ### R1. User interface - done
 
-- Arc-reactor style HUD (`frontend/index.html`, `frontend/style.css`).
+- Arc-reactor style HUD (`frontend/index.html`, `frontend/style.css`),
+  in English.
 - Reactor animation driven by the live microphone level (Web Audio API).
 - Camera on/off and frame capture (WebRTC).
-- Voice input (`MediaRecorder`) and typed input.
+- Voice input through the browser's speech recognition, and typed input.
+- A data form per model (button **Data**), generated from `GET /models`, to
+  run a model with custom values.
 - Text response, command list, conversation log and raw API response viewer.
-- Browser speech synthesis as an optional extra.
+- The answer is read aloud with the browser's speech synthesis.
 
-### R5. REST API - architecture done, models in progress
+### R5. REST API - done
 
 - FastAPI server with CORS; serves the frontend (`backend/main.py`).
 - `GET /health`, `GET /models`, `GET /models/{name}`,
@@ -99,64 +111,87 @@ by scientific papers. Required sections:
 - Single model orchestrator (`backend/core/orchestrator.py`), explicit model
   registry with duplicate detection, one package per model with an input
   schema. See [ADDING_A_MODEL.md](ADDING_A_MODEL.md).
-- Pending: expose the 10 trained models (1 of 10 done).
+- The 10 trained models are exposed (`GET /models`).
+- `POST /command` accepts `inputs_by_model`, so the interface can send the
+  values edited in each model's data form together with a spoken command.
+- Invalid inputs answer 422 with the reason, a missing model file 503.
 
-### R2. Emotion recognition - flow done, local model pending
+### R2. Emotion recognition - done (local model)
 
-- Done: camera frame capture, `POST /emotion`, normalized output
-  (`happiness`, `sadness`, `anger`, `surprise`, `neutral`), probability bars
-  and empathetic reply prefixes in the UI, and a mock mode for development.
-- Pending:
-  - Remove the Google Vision code (`_call_vision`, `parse_vision_response`,
-    `GOOGLE_API_KEY`) from `backend/services/emotion_service.py`.
-  - Choose a local architecture (e.g. a CNN trained on FER-2013, or a local
-    OpenCV / PyTorch / ONNX model).
-  - Add local face detection (e.g. Haar cascade or MediaPipe) to crop the
-    face before classification.
-  - Run inference locally in the backend.
+- Camera frame capture, `POST /emotion`, probability bars and empathetic
+  reply prefixes in the UI.
+- Local provider (`backend/services/emotion_service.py`): YuNet finds the
+  largest face in the frame and two pretrained networks classify its
+  expression into 8 emotions, FER+ and HSEmotion; their probabilities are
+  averaged. It is the default without a Google key. `EMOTION_MODEL` in `.env`
+  selects `ensemble` (default), `ferplus` or `hsemotion`.
+- Evaluation on the 7178 FER-2013 test faces
+  (`scripts/evaluate_emotion_model.py`, original labels, classifiers only):
 
-### R3. Speech-to-text and commands - flow done, local model pending
+  | Model | Accuracy | Macro recall | Sadness | Anger | Fear | Neutral |
+  |---|---|---|---|---|---|---|
+  | FER+ | 0.565 | 0.485 | 0.241 | 0.381 | 0.062 | 0.912 |
+  | HSEmotion | 0.560 | 0.523 | 0.407 | 0.511 | 0.384 | 0.564 |
+  | Both averaged (served) | 0.601 | 0.551 | 0.316 | 0.443 | 0.194 | 0.857 |
 
-- Done: browser recording (`audio/webm` or `audio/wav`), `POST /transcribe`,
-  command router with text normalization, tolerant wake word ("JarvisTEC",
-  "Jarvis", "yarvis tek"), fuzzy keyword matching and model execution, and a
-  mock mode for development.
-- Pending:
-  - Remove the Google Speech-to-Text code (`_call_speech`,
-    `parse_speech_response`) from `backend/services/speech_service.py`.
-  - Integrate a local offline engine (e.g. Whisper / faster-whisper, Vosk in
-    Spanish, or Wav2Vec2).
-  - Update `requirements.txt` accordingly.
+  FER+ alone calls most sad and angry faces neutral; the average recovers
+  part of them without losing the neutral and happy ones. The images are
+  48x48 grayscale, outside HSEmotion's training domain, so its numbers here
+  are a lower bound for webcam frames. The combination was chosen on this
+  same test set, so the table describes it rather than validating it.
+- The interface analyzes 3 frames and averages their scores, so a blink or a
+  half-formed expression weighs less.
+- Tested by the team with a real camera in Chrome.
+- Known limit: subtle or posed expressions remain hard; sadness and fear are
+  recognized in fewer than a third of the test faces.
+- Optional Google Vision provider, covered by tests with simulated
+  responses.
 
-### R4, R6. Machine learning models - 1 of 10
+### R3. Speech-to-text and commands - done (browser recognition)
 
-| # | Model | Dataset | Status |
+- Speech recognition in the browser (`frontend/app.js`, Web Speech API,
+  language `en-US`). Only the transcribed text is sent to `POST /command`.
+  It works in Chrome and Edge and needs an internet connection. Tested by the
+  team with a real microphone in Chrome.
+- Command router (`backend/services/intent_router.py`): text normalization,
+  tolerant wake word ("JarvisTEC", "Jarvis tech", "yarvis tek"), whole-word
+  phrase matching and per-word typo tolerance. Phrases about other topics
+  ("gold price") match no model; `tests/test_routing.py` covers both sides.
+- Some commands carry data in the sentence ("organic avocado price",
+  "recommend me a movie like Jurassic Park").
+- `POST /transcribe` runs Google Speech-to-Text when `GOOGLE_API_KEY` is
+  set. Without a key the server has no speech engine and answers 503 with an
+  explanation; it never returns an invented text.
+
+### R4, R6. Machine learning models and commands - 10 of 10 done
+
+| # | Model | Dataset | Main command |
 |---|---|---|---|
-| 1 | Wine quality | Kaggle `rajyellow46/wine-quality` | Trained and integrated; team review pending |
-| 2 | Car price | GitHub `amankharwal/Website-data` (`car data.csv`) | Not started |
-| 3 | Telco customer churn | GitHub `IBM/telco-customer-churn-on-icp4d` | Not started |
-| 4 | Stroke risk | Kaggle `fedesoriano/stroke-prediction-dataset` | Not started |
-| 5 | Avocado price | Kaggle `neuromusic/avocado-prices` | Not started |
-| 6 | Bitcoin price | Kaggle `team-ai/bitcoin-price-prediction` | Demo only (not trained) |
-| 7 | Body fat | Kaggle `fedesoriano/body-fat-prediction-dataset` | Not started |
-| 8 | Movie recommendation | Google Drive dataset from the assignment | Not started |
-| 9 | Hepatitis C | Kaggle `fedesoriano/hepatitis-c-dataset` | Not started |
-| 10 | Cirrhosis | Kaggle `fedesoriano/cirrhosis-prediction-dataset` | Not started |
+| 1 | Wine quality | Kaggle `rajyellow46/wine-quality` | JarvisTEC, wine quality |
+| 2 | Car price | GitHub `amankharwal/Website-data` (`car data.csv`) | JarvisTEC, car price |
+| 3 | Telco customer churn | GitHub `IBM/telco-customer-churn-on-icp4d` | JarvisTEC, customer churn |
+| 4 | Stroke risk | Kaggle `fedesoriano/stroke-prediction-dataset` | JarvisTEC, stroke risk |
+| 5 | Avocado price | Kaggle `neuromusic/avocado-prices` | JarvisTEC, avocado price |
+| 6 | Bitcoin price | Kaggle `team-ai/bitcoin-price-prediction` | JarvisTEC, bitcoin price |
+| 7 | Body fat | Kaggle `fedesoriano/body-fat-prediction-dataset` | JarvisTEC, body fat |
+| 8 | Movie recommendation | Google Drive dataset from the assignment | JarvisTEC, recommend a movie |
+| 9 | Hepatitis C | Kaggle `fedesoriano/hepatitis-c-dataset` | JarvisTEC, hepatitis type |
+| 10 | Cirrhosis | Kaggle `fedesoriano/cirrhosis-prediction-dataset` | JarvisTEC, cirrhosis stage |
 
-Each model needs a notebook with the 6 rubric sections, a backend package, a
-trained artifact and voice commands. Details and the definition of done are
-in [NEXT_STEPS.md](../NEXT_STEPS.md).
+Each model has a notebook with the 6 rubric sections, a model card, a trained
+artifact, a backend package, tests and voice commands. Results are in the
+[README](../README.md#models) and in each model card.
 
-### R7. Scientific document - not started
+### R7. Scientific document - written, Overleaf upload pending
 
-- [ ] Cover page
-- [ ] Proposed solution
-- [ ] ML architectures (vision, voice and the 10 predictive models)
-- [ ] Justification of the models
-- [ ] Analysis of the results (metrics, confusion matrices, ROC / R2 / RMSE,
-      response times)
-- [ ] Bibliography (IEEE, ACM, Springer or Scopus papers)
-- [ ] Appendices (screenshots, class diagrams, API endpoints)
+- [x] Cover page
+- [x] Proposed solution
+- [x] ML architectures (vision, voice and the 10 predictive models)
+- [x] Justification of the models
+- [x] Analysis of the results (metrics, baselines, response times, figures)
+- [x] Bibliography
+- [ ] Appendices: screenshots still to be added
+- [ ] Upload `docs/report/main.tex` and `docs/report/figures/` to Overleaf
 
 ## 7. Course dataset list
 

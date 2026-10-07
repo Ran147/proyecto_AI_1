@@ -109,10 +109,10 @@ class Wine(BaseModel):
     """Classifies wine quality as low, medium or high."""
 
     name = "wine"  # unique, lowercase, no spaces: /models/{name}
-    title = "Calidad del vino"  # Spanish display name (UI)
+    title = "Wine quality"  # display name (UI)
     description = "Classifies wine quality from its chemistry."
     task_type = "classification"
-    keywords = ["calidad del vino", "clasificar vino"]  # Spanish voice phrases
+    keywords = ["wine quality", "classify wine"]  # voice phrases, lowercase
     input_schema = WineInputs
     default_input = {"type": "white", "alcohol": 10.4}  # from meta.json
 
@@ -125,7 +125,7 @@ class Wine(BaseModel):
         return {"quality": str(label)}
 
     def speak(self, result: dict[str, Any]) -> str:
-        return f"La calidad estimada del vino es {result['quality']}."
+        return f"I estimate this wine is of {result['quality']} quality."
 ```
 
 `__init__.py` exports the class.
@@ -147,9 +147,9 @@ from .wine import Wine
 MODEL_CLASSES = [..., Wine]
 ```
 
-When the model replaces a demo with the same `name` (e.g. `bitcoin`), remove
-the demo from the list and delete its package (`demo_bitcoin/`); the API does
-not start with two models sharing a name.
+When a model replaces another one with the same `name`, remove the old class
+from the list and delete its package; the API does not start with two models
+sharing a name.
 
 Rules checked by the registry at startup:
 
@@ -167,12 +167,15 @@ Other rules:
 - Set `n_jobs=1` on the loaded estimator: every request predicts a single
   row, so a thread pool only adds latency.
 - `default_input` lets a voice command work without data (e.g. "JarvisTEC,
-  tipo de cambio para mañana").
-- `keywords`: 2-3 natural Spanish phrases a user would say, including the
-  topic name.
-- `is_demo = True` only for toy logic; trained models leave it `False`.
-- Never commit datasets or `.joblib` files (they are in `.gitignore`); the
-  model card explains how to regenerate them.
+  wine quality").
+- `keywords`: 3-5 natural English phrases a user would say, lowercase, each
+  containing the topic word. The router matches whole words and forgives
+  small typos in long words; add the model to the tables in
+  `tests/test_routing.py`.
+- Datasets are not committed (`data/` is git-ignored;
+  `scripts/download_datasets.py` fetches them). The trained artifacts in
+  `artifacts/` are committed: keep them small (compress large forests) and
+  commit the `.joblib` together with its `.meta.json`.
 
 ## 4. Test
 
@@ -182,11 +185,11 @@ uvicorn backend.main:app --reload
 ```
 
 In http://localhost:8000/docs try `POST /models/wine/predict` and
-`POST /command` with `{"text": "JarvisTEC calidad del vino"}`.
+`POST /command` with `{"text": "JarvisTEC wine quality"}`.
 
 Every trained model has its tests in `tests/models/test_<name>.py` (pattern:
 `tests/models/test_wine.py`). Tests that run the model are marked `skipif`
-when the artifact is missing, because `artifacts/` is not committed; the
+when the artifact is missing; the
 registration, validation (422) and missing-artifact (503) tests always run.
 
 To test an adapter without an artifact, `tests/test_orchestrator.py` shows how
