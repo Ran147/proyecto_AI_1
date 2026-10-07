@@ -29,6 +29,10 @@ class BaseModel(ABC):
     task_type: str = ""
     # Voice command phrases, lowercase, e.g. ["bitcoin price"].
     keywords: list[str] = []
+    # The same commands in Spanish, e.g. ["precio del bitcoin"]. Commands are
+    # understood in both languages (accents are ignored when matching); the
+    # answers are in English.
+    keywords_es: list[str] = []
     # True only for toy logic that is NOT a trained model.
     is_demo: bool = False
 
@@ -43,6 +47,10 @@ class BaseModel(ABC):
     def __init__(self) -> None:
         self._loaded = False
         self._load_lock = threading.Lock()
+
+    def phrases(self) -> list[str]:
+        """Return every command phrase, English first."""
+        return [*self.keywords, *self.keywords_es]
 
     def load(self) -> None:
         """Load the trained model (joblib, etc.) from artifacts/. Optional."""
@@ -112,6 +120,7 @@ class BaseModel(ABC):
             "task_type": self.task_type,
             "demo": self.is_demo,
             "keywords": self.keywords,
+            "keywords_es": self.keywords_es,
             "input_fields": self.describe_inputs(),
             "input_options": self.input_options(),
             "default_input": self.default_input,

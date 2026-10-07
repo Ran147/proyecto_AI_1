@@ -1,16 +1,18 @@
 """Speech-to-text on the server.
 
-Single entry point: ``transcribe(audio_bytes, content_type)``.
-Output: ``{"text": "...", "confidence": 0.93, "provider": "google"}``.
+Single entry point: ``transcribe(audio_bytes, content_type, language)``.
+Output: ``{"text": "...", "confidence": 0.93, "provider": "local",
+"language": "en"}``. Commands are understood in English ("en") and Spanish
+("es").
 
 Providers:
 
 - ``local``: Vosk, an offline speech recognizer (Kaldi acoustic model), with
-  its small English model stored in artifacts/. It needs no API key and no
-  internet connection. It takes WAV audio (16-bit PCM), which is what the web
-  interface records.
+  its small English and Spanish models stored in artifacts/. It needs no API
+  key and no internet connection. It takes WAV audio (16-bit PCM), which is
+  what the web interface records.
 - ``google``: Google Cloud Speech-to-Text (REST v1, needs GOOGLE_API_KEY).
-- ``browser``: the server has no speech engine (the local model is missing).
+- ``browser``: the server has no speech engine (no local model, no key).
   The web interface transcribes with the browser's Web Speech API and sends
   only the text to ``POST /command``; ``POST /transcribe`` answers 503 with
   that explanation.
@@ -36,11 +38,14 @@ SPEECH_URL = "https://speech.googleapis.com/v1/speech:recognize"
 MAX_HINT_PHRASES = 500
 
 
-LOCAL_MODEL_DIR = (
-    Path(__file__).resolve().parents[2]
-    / "artifacts"
-    / "vosk-model-small-en-us-0.15"
-)
+ARTIFACTS_DIR = Path(__file__).resolve().parents[2] / "artifacts"
+# Vosk model folder and Google language code of each supported language.
+LOCAL_MODEL_DIRS = {
+    "en": ARTIFACTS_DIR / "vosk-model-small-en-us-0.15",
+    "es": ARTIFACTS_DIR / "vosk-model-small-es-0.42",
+}
+GOOGLE_LANGUAGES = {"en": "en-US", "es": "es-US"}
+DEFAULT_LANGUAGE = "en"
 # Sample rate the Vosk model was trained on.
 LOCAL_SAMPLE_RATE = 16000
 # Longest recording the local model accepts, in seconds.
@@ -48,7 +53,7 @@ MAX_LOCAL_SECONDS = 60
 
 NO_PROVIDER_MESSAGE = (
     "No speech-to-text provider is available on the server: the local "
-    "model is missing (run scripts/download_speech_model.py) and "
+    "model is missing (run scripts/download_speech_models.py) and "
     "GOOGLE_API_KEY is not set. The web interface can still transcribe in "
     "the browser and send the text to POST /command."
 )
@@ -58,9 +63,20 @@ NOT_UNDERSTOOD_MESSAGE = (
 )
 
 
-def local_model_available() -> bool:
-    """Tell whether the files of the local speech model are in place."""
-    return (LOCAL_MODEL_DIR / "am" / "final.mdl").exists()
+def local_model_available(language: str = DEFAULT_LANGUAGE) -> bool:
+    """Tell whether the local speech model of ``language`` is in place."""
+    folder = LOCAL_MODEL_DIRS.get(language)
+    return folder is not None and (folder / "am" / "final.mdl").exists()
+
+
+def check_language(language: str | None) -> str:
+    """Return a supported language code; unknown ones answer 422."""
+    code = (language or DEFAULT_LANGUAGE).lower()[:2]
+    if code not in LOCAL_MODEL_DIRS:
+        raise HTTPException(
+            422, f"Unsupported language '{language}': use 'en' or 'es'"
+        )
+    return code
 
 
 def provider_name() -> str:
@@ -92,7 +108,9 @@ def _encoding_for(content_type: str) -> str | None:
     return None
 
 
-def build_config(content_type: str) -> dict:
+def build_config(
+    content_type: str, language: str = DEFAULT_LANGUAGE
+) -> dict:
     """Build the recognition config, including command hint phrases."""
     # Hint phrases greatly improve recognition of "JarvisTEC" and commands.
     phrases = [
@@ -101,7 +119,12 @@ def build_config(content_type: str) -> dict:
         *get_orchestrator().command_phrases(),
     ]
     config = {
-        "languageCode": os.getenv("SPEECH_LANGUAGE") or "en-US",
+        # SPEECH_LANGUAGE overrides the code used for English commands.
+        "languageCode": (
+            GOOGLE_LANGUAGES["es"]
+            if language == "es"
+            else os.getenv("SPEECH_LANGUAGE") or GOOGLE_LANGUAGES["en"]
+        ),
         "enableAutomaticPunctuation": False,
         "maxAlternatives": 1,
         "speechContexts": [
@@ -114,13 +137,15 @@ def build_config(content_type: str) -> dict:
     return config
 
 
-async def _call_speech(audio_bytes: bytes, content_type: str) -> dict:
+async def _call_speech(
+    audio_bytes: bytes, content_type: str, language: str = DEFAULT_LANGUAGE
+) -> dict:
     """HTTP call to Google Speech-to-Text (isolated for tests)."""
     key = os.getenv("GOOGLE_API_KEY")
     if not key:
         raise HTTPException(500, "GOOGLE_API_KEY is missing in .env")
     payload = {
-        "config": build_config(content_type),
+        "config": build_config(content_type, language),
         "audio": {"content": base64.b64encode(audio_bytes).decode()},
     }
     try:
@@ -157,18 +182,24 @@ def parse_speech_response(data: dict) -> dict:
     }
 
 
-async def _transcribe_google(audio_bytes: bytes, content_type: str) -> dict:
-    raw = await _call_speech(audio_bytes, content_type)
+async def _transcribe_google(
+    audio_bytes: bytes, content_type: str, language: str
+) -> dict:
+    raw = await _call_speech(audio_bytes, content_type, language)
     return parse_speech_response(raw)
 
 
-async def _transcribe_mock(audio_bytes: bytes, content_type: str) -> dict:
+async def _transcribe_mock(
+    audio_bytes: bytes, content_type: str, language: str
+) -> dict:
     """Simulated provider: returns MOCK_TRANSCRIPT and ignores the audio."""
     text = os.getenv("MOCK_TRANSCRIPT") or "JarvisTEC bitcoin price"
     return {"text": text, "confidence": None, "provider": "mock"}
 
 
-async def _transcribe_browser(audio_bytes: bytes, content_type: str) -> dict:
+async def _transcribe_browser(
+    audio_bytes: bytes, content_type: str, language: str
+) -> dict:
     """No engine on the server: say so instead of inventing a text."""
     raise HTTPException(503, NO_PROVIDER_MESSAGE)
 
@@ -215,15 +246,15 @@ def read_wav(audio_bytes: bytes) -> bytes:
 
 
 class LocalSpeechModel:
-    """Vosk recognizer over the small English model in artifacts/."""
+    """Vosk recognizer over one of the small models in artifacts/."""
 
-    def __init__(self) -> None:
+    def __init__(self, language: str) -> None:
         # Imported here so the API still starts without Vosk installed.
         import vosk
 
         vosk.SetLogLevel(-1)
         self.vosk = vosk
-        self.model = vosk.Model(str(LOCAL_MODEL_DIR))
+        self.model = vosk.Model(str(LOCAL_MODEL_DIRS[language]))
 
     def transcribe(self, audio_bytes: bytes) -> dict:
         pcm = read_wav(audio_bytes)
@@ -244,33 +275,34 @@ class LocalSpeechModel:
         return {"text": text, "confidence": confidence, "provider": "local"}
 
 
-_local_model: LocalSpeechModel | None = None
+_local_models: dict[str, LocalSpeechModel] = {}
 _local_model_lock = threading.Lock()
 
 
-def _get_local_model() -> LocalSpeechModel:
-    """Load the local model once, on first use."""
-    global _local_model
-    if _local_model is None:
+def _get_local_model(language: str) -> LocalSpeechModel:
+    """Load the local model of ``language`` once, on first use."""
+    if language not in _local_models:
         with _local_model_lock:
-            if _local_model is None:
-                if not local_model_available():
+            if language not in _local_models:
+                if not local_model_available(language):
                     raise HTTPException(503, NO_PROVIDER_MESSAGE)
                 try:
-                    _local_model = LocalSpeechModel()
+                    _local_models[language] = LocalSpeechModel(language)
                 except ImportError as exc:
                     raise HTTPException(
                         503,
                         "Vosk is missing. Install the dependencies in "
                         "requirements.txt.",
                     ) from exc
-    return _local_model
+    return _local_models[language]
 
 
-async def _transcribe_local(audio_bytes: bytes, content_type: str) -> dict:
+async def _transcribe_local(
+    audio_bytes: bytes, content_type: str, language: str
+) -> dict:
     # CPU-bound (loading and decoding): run outside the event loop.
     def run() -> dict:
-        return _get_local_model().transcribe(audio_bytes)
+        return _get_local_model(language).transcribe(audio_bytes)
 
     return await asyncio.to_thread(run)
 
@@ -283,9 +315,13 @@ PROVIDERS = {
 }
 
 
-async def transcribe(audio_bytes: bytes, content_type: str = "") -> dict:
-    """Transcribe audio with the active provider."""
+async def transcribe(
+    audio_bytes: bytes, content_type: str = "", language: str | None = None
+) -> dict:
+    """Transcribe audio with the active provider, in ``language``."""
     name = provider_name()
     if name not in PROVIDERS:
         raise HTTPException(500, f"Invalid SPEECH_PROVIDER: {name}")
-    return await PROVIDERS[name](audio_bytes, content_type)
+    code = check_language(language)
+    result = await PROVIDERS[name](audio_bytes, content_type, code)
+    return {**result, "language": code}

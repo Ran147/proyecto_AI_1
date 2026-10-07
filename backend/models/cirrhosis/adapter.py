@@ -27,6 +27,13 @@ class Cirrhosis(BaseModel):
         "type of cirrhosis",
         "cirrhosis",
     ]
+    # Spanish commands; the answers stay in English.
+    keywords_es = [
+        "tipo de cirrosis",
+        "etapa de cirrosis",
+        "cirrosis del paciente",
+        "cirrosis",
+    ]
     input_schema = CirrhosisInputs
     # A real stage-4 patient of the held-out test set (a clear case).
     # The training medians are in artifacts/cirrhosis.meta.json.

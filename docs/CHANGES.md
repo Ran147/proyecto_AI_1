@@ -19,7 +19,7 @@ trained models are in the repository and no API key is required.
 - Click a command, or press **Speak** and say "JarvisTEC, wine quality".
 - Open **Data** next to a command to run the model with your own values.
 - Turn the camera on and press **Analyze emotion**.
-- `python -m pytest` should report 315 passed.
+- `python -m pytest` should report 342 passed.
 
 If the page looks old (Spanish labels), reload with Ctrl+F5.
 
@@ -27,7 +27,7 @@ If the page looks old (Spanish labels), reload with Ctrl+F5.
 
 | Decision | Before | Now | Why |
 |---|---|---|---|
-| Language | Code in English, interface and commands in Spanish | Everything in English, including voice commands and spoken answers | Requirement for the delivery |
+| Language | Code in English, interface and commands in Spanish | Everything in English, including the spoken answers; commands are understood in English and in Spanish | Requirement for the delivery; Spanish commands are an extra |
 | Speech-to-text | Google Cloud (planned: local model) | Two engines: the browser's speech recognition (default) and a local Vosk model on the server | Google Cloud needs a billing account; neither engine needs a key, and the local one works offline |
 | Emotion | Google Vision (planned: local model) | Local pretrained networks in the backend (YuNet + FER+ + HSEmotion) | Same reason; it also keeps `POST /emotion` a real service |
 | Trained models | Git-ignored, regenerated from notebooks | Committed in `artifacts/` | Whoever clones can run the application immediately |
@@ -97,6 +97,17 @@ small typos are forgiven only in long words and only if every word matches.
 `tests/test_routing.py` checks natural phrasings, recognizer slips and
 phrases that must not match.
 
+### Commands in Spanish
+
+Every model has Spanish phrases next to the English ones (`keywords_es` in
+its adapter): "JarvisTEC, calidad del vino", "precio del carro", "tipo de
+cirrosis"... The **Commands** button in the header switches the language the
+speech recognition listens for; typed commands work in either language at any
+time. Data in the sentence works too ("vino tinto", "aguacate orgánico", "una
+película como Jurassic Park"). The answers stay in English. The server has a
+second Vosk model for Spanish; it loads and runs but we have not checked it
+with speech yet, so try it.
+
 ### Emotion service (`backend/services/emotion_service.py`)
 
 Local provider: YuNet finds the face, FER+ and HSEmotion classify it and
@@ -159,7 +170,7 @@ go to Overleaf and get the screenshots.
 
 - The browser's speech recognition needs Chrome or Edge and an internet
   connection; the local model works anywhere but is less accurate.
-- Movie titles and commands are English only.
+- Movie titles are English only; the answers are always in English.
 - Car prices are in Indian rupees; the body fat model was trained on men
   only; avocado data ends in March 2018 and bitcoin data in July 2017.
 - The medical models are estimates, not diagnoses; hepatitis and cirrhosis

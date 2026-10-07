@@ -10,8 +10,8 @@ from .schema import WineInputs
 
 # Whole words only: a substring check would match "preferred".
 TYPE_PATTERNS = {
-    "red": re.compile(r"\bred\b"),
-    "white": re.compile(r"\bwhite\b"),
+    "red": re.compile(r"\b(?:red|tinto)\b"),
+    "white": re.compile(r"\b(?:white|blanco)\b"),
 }
 
 
@@ -32,6 +32,12 @@ class Wine(BaseModel):
         "classify wine",
         "how good is this wine",
         "wine",
+    ]
+    # Spanish commands; the answers stay in English.
+    keywords_es = [
+        "calidad del vino",
+        "clasificar vino",
+        "qué tan bueno es este vino",
     ]
     input_schema = WineInputs
     # A real white wine of the held-out test set, rated high quality by

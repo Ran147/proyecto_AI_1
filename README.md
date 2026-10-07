@@ -28,8 +28,8 @@ model are committed in `artifacts/`, and no API key is needed.
 - **Voice** has two engines, switched with the **Speech** button in the
   header. The default is the browser's own speech recognition (Web Speech
   API, Chrome or Edge, needs internet). The other is a local model on the
-  server (Vosk, offline, any browser): the page records WAV audio and
-  `POST /transcribe` returns the text. If the browser's recognition fails,
+  server (Vosk, offline, any browser, English and Spanish models): the page
+  records WAV audio and `POST /transcribe` returns the text. If the browser's recognition fails,
   the page switches to the local model by itself.
 - **Emotion** runs on a local model in the backend: the YuNet face detector,
   then the FER+ and HSEmotion expression classifiers averaged, through OpenCV.
@@ -40,7 +40,14 @@ model are committed in `artifacts/`, and no API key is needed.
 ## Using it
 
 Say or type a command that starts with "JarvisTEC" (or "Jarvis"), or click one
-in the list. Everything is in English.
+in the list. Commands are understood in English and in Spanish; the
+**Commands** button in the header tells the speech recognition which one to
+listen for. The interface and the answers are in English.
+
+Spanish examples: "JarvisTEC, calidad del vino", "precio del carro",
+"abandono de clientes", "riesgo de derrame cerebral", "precio del aguacate",
+"precio del bitcoin", "grasa corporal", "recomiéndame una película", "tipo
+de hepatitis", "tipo de cirrosis".
 
 | Model | Main command | Also understands |
 |---|---|---|
@@ -59,7 +66,8 @@ in the list. Everything is in English.
   next to each command opens a form with the model's inputs; edited values
   also apply to later spoken or typed commands.
 - Three commands take data in the sentence: "red wine quality", "organic
-  avocado price", "recommend me a movie like Jurassic Park".
+  avocado price", "recommend me a movie like Jurassic Park" (in Spanish:
+  "vino tinto", "aguacate orgánico", "una película como Jurassic Park").
 - The percentage in an answer is the model's estimate for that case, not the
   model's accuracy. The accuracy of each model is in its notebook and model
   card.
@@ -74,7 +82,7 @@ in the list. Everything is in English.
 | POST | `/models/{name}/predict` | Run a model. Body: `{"inputs": {...}}`; missing inputs take defaults |
 | POST | `/command` | Text to the right model. Body: `{"text": "JarvisTEC wine quality"}` |
 | POST | `/emotion` | Image (field `image`) to dominant emotion and scores |
-| POST | `/transcribe` | Audio (field `audio`, WAV) to text, with the local model or Google |
+| POST | `/transcribe` | Audio (field `audio`, WAV; field `language`: `en` or `es`) to text, with the local model or Google |
 
 `POST /transcribe` never returns an invented text: if the server has neither
 the local model nor a Google key, it answers 503 and says so.
@@ -117,7 +125,7 @@ frontend/               HTML, CSS and JavaScript interface
 training/               offline training; never imported by the backend
   _template/            notebook with the 6 rubric sections + model card template
   <name>/               notebook and model card of each model
-artifacts/              trained models (.joblib + .meta.json), emotion networks (.onnx), speech model
+artifacts/              trained models (.joblib + .meta.json), emotion networks (.onnx), speech models
 scripts/                dataset and model downloads, emotion evaluation, timing
 tests/                  pytest suite; tests/models/ has one file per model
 data/                   datasets; git-ignored (scripts/download_datasets.py)
@@ -127,7 +135,7 @@ docs/                   project documentation and the written report (docs/repor
 ## Development
 
 ```bash
-python -m pytest                     # 315 tests
+python -m pytest                     # 342 tests
 pip install ruff && ruff check backend tests scripts   # PEP 8 lint (79 columns)
 ```
 
@@ -141,8 +149,8 @@ jupyter nbconvert --to notebook --execute --inplace training/wine/notebook.ipynb
 ```
 
 Other scripts: `scripts/download_emotion_models.py` and
-`scripts/download_speech_model.py` (re-fetch the emotion networks and the
-speech model, with hash check), `scripts/evaluate_emotion_model.py` (emotion
+`scripts/download_speech_models.py` (re-fetch the emotion networks and the
+speech models, with hash check), `scripts/evaluate_emotion_model.py` (emotion
 classifiers on FER-2013), `scripts/measure_response_times.py`.
 
 ## Documentation

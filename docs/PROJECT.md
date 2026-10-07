@@ -161,12 +161,21 @@ models. The history of the last big update is in [CHANGES.md](CHANGES.md).
 - Some commands carry data in the sentence ("organic avocado price",
   "recommend me a movie like Jurassic Park").
 - Local model on the server (`backend/services/speech_service.py`): Vosk,
-  an offline Kaldi-based recognizer, with its small English model in
-  `artifacts/`. The interface records WAV audio (16-bit PCM, 16 kHz) and
+  an offline Kaldi-based recognizer, with its small English and Spanish
+  models in `artifacts/`. The interface records WAV audio (16-bit PCM, 16 kHz) and
   `POST /transcribe` returns the text and a confidence. It works without
   internet and in any browser. The **Speech** button switches between the
   two engines, and the page switches to the local model by itself when the
   browser's recognition fails.
+- Commands in two languages: every model has English and Spanish phrases
+  (`keywords` and `keywords_es` in its adapter). The **Commands** button
+  sets the language the recognition listens for (`en-US` or `es-CR` in the
+  browser; the English or Spanish Vosk model on the server, chosen with the
+  `language` field of `POST /transcribe`). Answers are always in English.
+- The English local model was checked with 15 commands spoken by a
+  synthetic voice (see below). The Spanish local model loads and runs, but
+  it has not been checked with speech: no Spanish voice or recording was
+  available on the development machine.
 - Checked with 15 commands spoken by a synthetic voice: every transcription
   reached the right model, in about 0.7 s each. Not yet measured with real
   voices; the model's published word error rate is about 10 %.

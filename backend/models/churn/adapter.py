@@ -31,6 +31,14 @@ class Churn(BaseModel):
         "customer leaving",
         "churn",
     ]
+    # Spanish commands; the answers stay in English.
+    keywords_es = [
+        "abandono de clientes",
+        "fuga de clientes",
+        "el cliente se va a ir",
+        "cliente va a abandonar",
+        "cliente va a cambiar de compañía",
+    ]
     input_schema = ChurnInputs
     # A real customer of the held-out test set who did leave: recent,
     # month-to-month contract, fiber optic (a clear case). The training

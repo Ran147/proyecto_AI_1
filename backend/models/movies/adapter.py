@@ -20,14 +20,19 @@ SPOKEN_TITLES = 5
 
 # Words that introduce the reference movie in a spoken command; the title
 # is whatever follows them (after an optional "the movie" / "the film").
+# English and Spanish ("una pelicula como jurassic park").
 COMMAND_TITLE = re.compile(
-    r"\b(?:like|similar to)\s+(?:the (?:movie|film)\b\s*)?"
+    r"\b(?:like|similar to|como|parecidas? a|similar(?:es)? a)\s+"
+    r"(?:(?:the (?:movie|film)|la pelicula)\b\s*)?"
 )
 # Courtesy words said after the title, which are not part of it.
-COURTESY = re.compile(r"(?:^|\s+)(?:please|thanks|thank you)$")
+COURTESY = re.compile(
+    r"(?:^|\s+)(?:please|thanks|thank you|por favor|gracias)$"
+)
 # Words of the request itself: text that has them is not a title
-# ("i would like you to recommend a movie").
-NOT_A_TITLE = re.compile(r"\b(?:recommend|movie|film)")
+# ("i would like you to recommend a movie", "como estas recomiendame una
+# pelicula").
+NOT_A_TITLE = re.compile(r"\b(?:recom|movie|film|pelicula)")
 
 
 class Movies(BaseModel):
@@ -51,6 +56,15 @@ class Movies(BaseModel):
         "what movie should i watch",
         "suggest a movie",
         "i want to watch a movie",
+    ]
+    # Spanish commands; the answers stay in English.
+    keywords_es = [
+        "recomiéndame una película",
+        "recomendar una película",
+        "recomendar película",
+        "qué película puedo ver",
+        "recomendación de películas",
+        "quiero ver una película",
     ]
     input_schema = MoviesInputs
     # A well-known title of the catalog; see artifacts/movies.meta.json.

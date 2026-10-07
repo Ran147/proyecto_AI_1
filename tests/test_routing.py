@@ -17,8 +17,10 @@ def route(text: str) -> str | None:
 
 def test_every_keyword_reaches_its_own_model():
     for model in get_orchestrator().list_models():
-        for keyword in model["keywords"]:
-            for prefix in ("", "JarvisTEC, ", "hey Jarvis tech "):
+        assert model["keywords_es"], model["name"]
+        for keyword in model["keywords"] + model["keywords_es"]:
+            prefixes = ("", "JarvisTEC, ", "hey Jarvis tech ", "oye Jarvis ")
+            for prefix in prefixes:
                 assert route(prefix + keyword) == model["name"], (
                     prefix + keyword
                 )
@@ -92,3 +94,63 @@ def test_wake_word_variants_are_stripped(text, rest):
 
 def test_command_without_wake_word_is_kept_whole():
     assert strip_wake_word("wine quality") == ("wine quality", False)
+
+
+# ---------- Spanish commands ----------
+@pytest.mark.parametrize("text, model", [
+    ("JarvisTEC, calidad del vino", "wine"),
+    ("Jarvis, ¿qué tan bueno es este vino?", "wine"),
+    ("JarvisTEC cuál es el precio del carro", "car_price"),
+    ("Jarvis tec cuánto cuesta mi carro", "car_price"),
+    ("JarvisTEC el cliente se va a ir", "churn"),
+    ("Jarvis, riesgo de derrame cerebral", "stroke"),
+    ("JarvisTEC precio de los aguacates", "avocado"),
+    ("Jarvis precio del bitcoin para mañana", "bitcoin"),
+    ("JarvisTEC cuánta grasa tengo", "body_fat"),
+    ("Jarvis, recomiéndame una película como Jurassic Park", "movies"),
+    ("JarvisTEC quiero ver una película", "movies"),
+    ("JarvisTEC tipo de hepatitis", "hepatitis"),
+    ("Jarvis etapa de cirrosis", "cirrhosis"),
+])
+def test_spanish_phrasings(text, model):
+    assert route(text) == model
+
+
+@pytest.mark.parametrize("text", [
+    "JarvisTEC precio del oro",
+    "JarvisTEC precio del barro",
+    "JarvisTEC ya vino mi mamá",
+    "JarvisTEC el cliente vino a preguntar",
+    "JarvisTEC calidad del video",
+    "JarvisTEC riesgo de derrumbe",
+    "JarvisTEC porcentaje de gracia",
+    "JarvisTEC precio del aguacero",
+    "JarvisTEC cuéntame un chiste",
+])
+def test_unrelated_spanish_phrases_reach_no_model(text):
+    assert route(text) is None
+
+
+def test_spanish_data_in_the_sentence():
+    orchestrator = get_orchestrator()
+
+    def said(text):
+        model, _ = orchestrator.match(text)
+        cleaned, _ = strip_wake_word(text)
+        return orchestrator._registry.get(model).inputs_from_command(cleaned)
+
+    assert said("JarvisTEC calidad del vino tinto") == {"type": "red"}
+    assert said("JarvisTEC calidad del vino blanco") == {"type": "white"}
+    assert said("JarvisTEC calidad del vino distinto") == {}
+    assert said("JarvisTEC precio del aguacate orgánico") == {
+        "type": "organic"
+    }
+    assert said("JarvisTEC precio del aguacate inorgánico") == {}
+    assert said("Jarvis recomiéndame una película como Jurassic Park") == {
+        "title": "jurassic park"
+    }
+    assert said(
+        "Jarvis recomiéndame una película parecida a Toy Story por favor"
+    ) == {"title": "toy story"}
+    # "como" here is not followed by a title.
+    assert said("Jarvis como estás recomiéndame una película") == {}

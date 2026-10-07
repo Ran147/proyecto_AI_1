@@ -35,6 +35,12 @@ class Hepatitis(BaseModel):
         "classify hepatitis",
         "hepatitis",
     ]
+    # Spanish commands; the answers stay in English.
+    keywords_es = [
+        "tipo de hepatitis",
+        "clasificar hepatitis",
+        "hepatitis del paciente",
+    ]
     input_schema = HepatitisInputs
     # Training median/mode, taken from artifacts/hepatitis.meta.json. It is
     # a healthy profile: 88 % of the training patients are blood donors.

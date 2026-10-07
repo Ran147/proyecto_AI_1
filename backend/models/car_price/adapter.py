@@ -30,6 +30,16 @@ class CarPrice(BaseModel):
         "used car price",
         "how much is my car worth",
     ]
+    # Spanish commands; the answers stay in English.
+    keywords_es = [
+        "precio del carro",
+        "precio de mi carro",
+        "cuánto vale mi carro",
+        "cuánto cuesta mi carro",
+        "precio del automóvil",
+        "precio de un automóvil usado",
+        "precio del vehículo",
+    ]
     input_schema = CarPriceInputs
     # Training median/mode, taken from artifacts/car_price.meta.json.
     default_input = {

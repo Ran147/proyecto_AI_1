@@ -169,7 +169,8 @@ Other rules:
 - `default_input` lets a voice command work without data (e.g. "JarvisTEC,
   wine quality").
 - `keywords`: 3-5 natural English phrases a user would say, lowercase, each
-  containing the topic word. The router matches whole words and forgives
+  containing the topic word. `keywords_es`: the same in Spanish (accents are
+  ignored when matching). The router matches whole words and forgives
   small typos in long words; add the model to the tables in
   `tests/test_routing.py`.
 - Datasets are not committed (`data/` is git-ignored;

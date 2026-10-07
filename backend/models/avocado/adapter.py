@@ -17,8 +17,8 @@ MONTHS = [
 ]
 # Whole words only: "inorganic" must not select the organic type.
 TYPE_PATTERNS = {
-    "organic": re.compile(r"\borganic\b"),
-    "conventional": re.compile(r"\bconventional\b"),
+    "organic": re.compile(r"\b(?:organic|organicos?)\b"),
+    "conventional": re.compile(r"\b(?:conventional|convencional(?:es)?)\b"),
 }
 
 
@@ -71,6 +71,14 @@ class Avocado(BaseModel):
         "avocado forecast",
         "how much will avocado cost",
         "avocado",
+    ]
+    # Spanish commands; the answers stay in English.
+    keywords_es = [
+        "precio del aguacate",
+        "precio de los aguacates",
+        "pronóstico del aguacate",
+        "cuánto costará el aguacate",
+        "aguacate",
     ]
     input_schema = AvocadoInputs
     # No data needed: the history comes from artifacts/avocado.meta.json.

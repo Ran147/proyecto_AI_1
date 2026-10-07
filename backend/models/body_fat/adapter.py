@@ -40,6 +40,14 @@ class BodyFat(BaseModel):
         "how much body fat do i have",
         "fat percentage",
     ]
+    # Spanish commands; the answers stay in English.
+    keywords_es = [
+        "grasa corporal",
+        "porcentaje de grasa corporal",
+        "cuánta grasa corporal tengo",
+        "porcentaje de grasa",
+        "cuánta grasa tengo",
+    ]
     input_schema = BodyFatInputs
     # Training medians, taken from artifacts/body_fat.meta.json.
     default_input = {

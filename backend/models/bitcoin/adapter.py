@@ -89,6 +89,12 @@ class Bitcoin(BaseModel):
         "bit coin",
         "bitcoin",
     ]
+    # Spanish commands; the answers stay in English.
+    keywords_es = [
+        "precio del bitcoin",
+        "precio de bitcoin",
+        "precio del bitcoin para mañana",
+    ]
     input_schema = BitcoinInputs
     # Last close of the data (2017-07-31), from artifacts/bitcoin.meta.json.
     # With this value the forecast is the one for the day after the data.

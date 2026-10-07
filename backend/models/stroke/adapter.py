@@ -28,6 +28,13 @@ class Stroke(BaseModel):
         "risk of stroke",
         "stroke",
     ]
+    # Spanish commands; the answers stay in English.
+    keywords_es = [
+        "riesgo de derrame cerebral",
+        "riesgo de derrame",
+        "derrame cerebral",
+        "accidente cerebrovascular",
+    ]
     input_schema = StrokeInputs
     # Training median/mode, taken from artifacts/stroke.meta.json.
     default_input = {

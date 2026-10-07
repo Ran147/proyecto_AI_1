@@ -11,12 +11,18 @@
 
 // Optional API base URL, e.g. ?api=http://localhost:8000
 const API = new URLSearchParams(location.search).get("api") || "";
-// Language of the speech recognition and of the spoken answers.
+// Language of the answers, written and spoken.
 const LANGUAGE = "en-US";
+// Commands are understood in English and Spanish; this is what the speech
+// recognition listens for.
+const COMMAND_LANGUAGES = {
+  en: { label: "English", recognition: "en-US" },
+  es: { label: "Spanish", recognition: "es-CR" },
+};
 
 const $ = (id) => document.getElementById(id);
 const el = {
-  apiStatus: $("apiStatus"), btnMute: $("btnMute"), btnEngine: $("btnEngine"),
+  apiStatus: $("apiStatus"), btnMute: $("btnMute"), btnEngine: $("btnEngine"), btnLang: $("btnLang"),
   video: $("video"), videoWrap: document.querySelector(".video-wrap"),
   btnCam: $("btnCam"), btnEmotion: $("btnEmotion"),
   emotionLabel: $("emotionLabel"), emotionNote: $("emotionNote"), emotionBars: $("emotionBars"),
@@ -44,7 +50,7 @@ const NO_EMOTION_NOTE = "Turn the camera on so JarvisTEC can read your expressio
 // local model or Google); "browser" uses the Web Speech API of Chrome and
 // Edge; "none" when neither is available. serverSpeech is the provider the
 // server reports, or null when it has no engine.
-let state = { camOn: false, stream: null, recording: false, voice: true, emotion: "neutral", busy: false, speech: "none", serverSpeech: null };
+let state = { camOn: false, stream: null, recording: false, voice: true, emotion: "neutral", busy: false, speech: "none", serverSpeech: null, lang: "en", chips: [] };
 const ENGINE_LABELS = { local: "local model", google: "Google", mock: "simulated" };
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition = null;
@@ -135,18 +141,30 @@ function switchSpeechEngine() {
   state.speech = state.speech === "browser" ? "server" : "browser";
   showSpeechEngine();
 }
+// Main phrase of a model in the language of the commands.
+function phraseOf(m) {
+  return (state.lang === "es" && (m.keywords_es || [])[0]) || m.keywords[0] || m.name;
+}
+function switchCommandLanguage() {
+  if (state.recording) return;
+  state.lang = state.lang === "en" ? "es" : "en";
+  el.btnLang.textContent = `Commands: ${COMMAND_LANGUAGES[state.lang].label}`;
+  state.chips.forEach(({ label, model }) => { label.textContent = `JarvisTEC, ${phraseOf(model)}`; });
+  el.typed.placeholder = `Or type a command: JarvisTEC, ${state.lang === "es" ? "calidad del vino" : "wine quality"}`;
+}
 function renderCommands(models) {
   el.commands.innerHTML = "";
+  state.chips = [];
   models.forEach(m => {
     const item = document.createElement("div");
     item.className = "chip-item";
     const b = document.createElement("button");
     b.className = "chip";
-    const phrase = m.keywords[0] || m.name;
     b.innerHTML = "<b></b><small></small>";
-    b.querySelector("b").textContent = `JarvisTEC, ${phrase}`;
+    b.querySelector("b").textContent = `JarvisTEC, ${phraseOf(m)}`;
     b.querySelector("small").textContent = m.title;
-    b.onclick = () => sendCommand(`JarvisTEC ${phrase}`);
+    b.onclick = () => sendCommand(`JarvisTEC ${phraseOf(m)}`);
+    state.chips.push({ label: b.querySelector("b"), model: m });
     item.appendChild(b);
     const fields = Object.keys(m.default_input || {});
     if (fields.length) {
@@ -155,7 +173,7 @@ function renderCommands(models) {
       toggle.textContent = "Data";
       toggle.setAttribute("aria-expanded", "false");
       toggle.title = "Edit the data this model uses";
-      const form = buildInputForm(m, phrase);
+      const form = buildInputForm(m);
       form.hidden = true;
       toggle.onclick = () => {
         form.hidden = !form.hidden;
@@ -171,7 +189,7 @@ function renderCommands(models) {
 // The form is generated from GET /models: one control per default_input
 // field. Only the values the user changed are sent; the rest keep the
 // model's defaults.
-function buildInputForm(m, phrase) {
+function buildInputForm(m) {
   const form = document.createElement("form");
   form.className = "inputs"; form.autocomplete = "off"; form.noValidate = true;
   Object.entries(m.default_input).forEach(([field, value]) => {
@@ -231,7 +249,7 @@ function buildInputForm(m, phrase) {
       el.response.scrollIntoView({ block: "center", behavior: "smooth" });
       return;
     }
-    sendCommand(`JarvisTEC ${phrase}`);
+    sendCommand(`JarvisTEC ${phraseOf(m)}`);
   };
   return form;
 }
@@ -521,7 +539,7 @@ function startBrowserSpeech() {
   stopSpeaking();
   let finalText = "", error = null;
   recognition = new SpeechRecognition();
-  recognition.lang = LANGUAGE;
+  recognition.lang = COMMAND_LANGUAGES[state.lang].recognition;
   recognition.interimResults = true;  // show the words while they are said
   recognition.maxAlternatives = 1;
   recognition.onresult = (e) => {
@@ -588,6 +606,7 @@ async function onRecordingDone(blob) {
   setState("thinking"); say("Transcribing…");
   try {
     const fd = new FormData(); fd.append("audio", blob, "audio.wav");
+    fd.append("language", state.lang);
     const { text, provider } = await api("/transcribe", { method: "POST", body: fd });
     if (!text) throw new Error(NOT_UNDERSTOOD);
     if (provider === "mock") logLine("err", "Simulated transcription (SPEECH_PROVIDER=mock).");
@@ -602,6 +621,7 @@ el.btnCam.onclick = toggleCamera;
 el.btnEmotion.onclick = () => analyzeEmotion();
 el.btnMic.onclick = toggleMic;
 el.btnEngine.onclick = switchSpeechEngine;
+el.btnLang.onclick = switchCommandLanguage;
 el.form.onsubmit = async (e) => {
   e.preventDefault();
   // The text is kept when the command could not be sent yet.

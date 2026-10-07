@@ -1,5 +1,5 @@
 """Speech-to-text endpoint."""
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from ..services.speech_service import transcribe as run_transcription
 
@@ -9,10 +9,14 @@ MAX_AUDIO_BYTES = 10 * 1024 * 1024
 
 
 @router.post("/transcribe")
-async def transcribe(audio: UploadFile = File(...)):
+async def transcribe(
+    audio: UploadFile = File(...),
+    language: str = Form("en"),
+):
     """Take audio and return the transcribed text.
 
     The local model takes WAV (16-bit PCM); Google also takes webm/ogg.
+    ``language`` is "en" (default) or "es".
     """
     data = await audio.read()
     if not data:
@@ -21,4 +25,6 @@ async def transcribe(audio: UploadFile = File(...)):
         raise HTTPException(
             413, "The audio is too long (about 1 minute at most)"
         )
-    return await run_transcription(data, audio.content_type or "")
+    return await run_transcription(
+        data, audio.content_type or "", language
+    )

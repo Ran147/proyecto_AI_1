@@ -48,7 +48,8 @@ def strip_wake_word(text: str) -> tuple[str, bool]:
     """
     wake_word = normalize(os.getenv("WAKE_WORD") or "jarvistec")
     words = normalize(text).split()
-    if words and words[0] in ("hey", "ok", "okay", "hi", "hello"):
+    greetings = ("hey", "ok", "okay", "hi", "hello", "hola", "oye")
+    if words and words[0] in greetings:
         words = words[1:]
     if not words:
         return "", False
@@ -107,7 +108,7 @@ def match_command(
     words = cleaned.split()
     best_model, best_score = None, 0.0
     for model in models:
-        for keyword in model.keywords:
+        for keyword in model.phrases():
             score = _score(keyword, words)
             if score > best_score:
                 best_model, best_score = model, score

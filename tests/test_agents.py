@@ -107,7 +107,7 @@ def test_transcribe_endpoint_google(monkeypatch):
     monkeypatch.setenv("GOOGLE_API_KEY", "fake")
     seen = {}
 
-    async def fake_speech(audio, content_type):
+    async def fake_speech(audio, content_type, language):
         seen["content_type"] = content_type
         return {"results": [{"alternatives": [{
             "transcript": "wine quality",

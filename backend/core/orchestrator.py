@@ -42,7 +42,7 @@ class ModelOrchestrator:
         """Reject a phrase shared by two models: routing would be ambiguous."""
         owners: dict[str, str] = {}
         for model in self._registry:
-            for keyword in model.keywords:
+            for keyword in model.phrases():
                 key = normalize(keyword)
                 if key in owners and owners[key] != model.name:
                     raise RegistrationError(
@@ -66,7 +66,7 @@ class ModelOrchestrator:
 
     def command_phrases(self) -> list[str]:
         """Return every voice command phrase of every model."""
-        return [kw for model in self._registry for kw in model.keywords]
+        return [kw for model in self._registry for kw in model.phrases()]
 
     # ---------- Execution ----------
     def predict(
