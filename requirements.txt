@@ -1,15 +1,24 @@
+# Tested with Python 3.14.2. The libraries that read the trained models in
+# artifacts/ are pinned to the versions the models were saved with.
 fastapi>=0.110
 uvicorn[standard]>=0.29
 python-multipart>=0.0.9
 python-dotenv>=1.0
 pydantic>=2.6
-numpy
-pandas
-scikit-learn
-joblib
-httpx
-pytest
+httpx>=0.27
+
+# Model inference: keep these in step with artifacts/*.meta.json
+numpy==2.5.3
+pandas==3.0.6
+scikit-learn==1.9.1
+joblib==1.6.0
+# Local emotion recognition (YuNet + FER+ + HSEmotion through OpenCV)
+opencv-python-headless==5.0.0.93
+
+# Tests
+pytest>=8
 
 # Offline training (training/<name>/notebook.ipynb); not imported by the backend
-matplotlib   # plots in the EDA and evaluation sections of the notebook template
-ipykernel    # runs the notebooks in Jupyter / VS Code
+matplotlib>=3.9   # plots in the notebooks
+ipykernel>=6      # runs the notebooks in Jupyter / VS Code
+nbconvert>=7      # runs a notebook from the command line

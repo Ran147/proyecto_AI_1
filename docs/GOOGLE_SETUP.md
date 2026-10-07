@@ -1,8 +1,9 @@
 # Google Cloud setup (face and voice)
 
-> **Temporary.** The project will replace these APIs with local models (see
-> [PROJECT.md](PROJECT.md), sections R2 and R3). Until then, this guide
-> enables real emotion detection and transcription.
+> Optional. The project runs without any key: voice is transcribed by the
+> browser and emotion by a local model (see [PROJECT.md](PROJECT.md),
+> sections R2 and R3). This guide switches both to the Google Cloud APIs,
+> which the assignment allows.
 
 JarvisTEC can use two Google APIs:
 
@@ -41,18 +42,20 @@ leaks, delete it in the console and create a new one.
 Every member can use the same key (share it through a private channel, never
 the repository) or create their own key in the same project.
 
-## Mock mode
+## Without a key
 
-When `GOOGLE_API_KEY` is empty, the backend runs in mock mode so it can be
-developed without credentials:
+Nothing has to be configured:
 
-- `/emotion` returns a random emotion (or a fixed one with
-  `MOCK_EMOTION=happiness` in `.env`).
-- `/transcribe` returns the text of `MOCK_TRANSCRIPT` without listening to
-  the audio.
+- Voice: the interface uses the speech recognition built into Chrome and
+  Edge and never calls `/transcribe`. `POST /transcribe` answers 503 and says
+  that no speech provider is configured.
+- Emotion: `/emotion` runs the local model (YuNet + FER+ + HSEmotion); its
+  files are in `artifacts/`.
 
-Responses include `"provider": "mock"` and the interface shows it. **Do not
-use mock mode in the demo or the evaluation.**
+Simulated providers exist for development and tests only
+(`EMOTION_PROVIDER=mock`, `SPEECH_PROVIDER=mock` in `.env`); their responses
+include `"provider": "mock"` and the interface shows it. **Do not use them in
+the demo or the evaluation.**
 
 ## How emotions are interpreted
 
@@ -77,5 +80,5 @@ limitation (4 emotions, no fear or disgust) must be stated in the document.
 
 `backend/services/emotion_service.py` and `speech_service.py` each expose a
 single public function (`detect_emotion`, `transcribe`) and a `PROVIDERS`
-dictionary. To add a provider (e.g. a local model), write a new function and
+dictionary. To add a provider (e.g. Azure), write a new function and
 register it there; the rest of the system does not change.

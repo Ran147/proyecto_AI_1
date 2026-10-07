@@ -15,6 +15,7 @@ def no_real_keys(monkeypatch):
     monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
     monkeypatch.setenv("EMOTION_PROVIDER", "auto")
     monkeypatch.setenv("SPEECH_PROVIDER", "auto")
+    monkeypatch.delenv("SPEECH_LANGUAGE", raising=False)
 
 
 def vision_face(**likelihoods):
@@ -63,11 +64,11 @@ def test_vision_api_error():
 # ---------- Google Speech-to-Text ----------
 def test_speech_ok():
     data = {"results": [{"alternatives": [{
-        "transcript": " JarvisTEC precio del bitcoin ",
+        "transcript": " JarvisTEC bitcoin price ",
         "confidence": 0.92,
     }]}]}
     out = speech_service.parse_speech_response(data)
-    assert out["text"] == "JarvisTEC precio del bitcoin"
+    assert out["text"] == "JarvisTEC bitcoin price"
 
 
 def test_speech_empty():
@@ -80,9 +81,9 @@ def test_speech_config_has_hints_and_encoding():
     config = speech_service.build_config("audio/webm;codecs=opus")
     phrases = config["speechContexts"][0]["phrases"]
     assert config["encoding"] == "WEBM_OPUS"
-    assert config["languageCode"] == "es-CR"
+    assert config["languageCode"] == "en-US"
     assert "JarvisTEC" in phrases
-    assert "precio del bitcoin" in phrases
+    assert "bitcoin price" in phrases
     assert "encoding" not in speech_service.build_config("audio/wav")
 
 
@@ -109,7 +110,7 @@ def test_transcribe_endpoint_google(monkeypatch):
     async def fake_speech(audio, content_type):
         seen["content_type"] = content_type
         return {"results": [{"alternatives": [{
-            "transcript": "calidad del vino",
+            "transcript": "wine quality",
             "confidence": 0.9,
         }]}]}
 
@@ -117,12 +118,31 @@ def test_transcribe_endpoint_google(monkeypatch):
     response = client.post(
         "/transcribe", files={"audio": ("a.webm", b"123", "audio/webm")}
     )
-    assert response.json()["text"] == "calidad del vino"
+    assert response.json()["text"] == "wine quality"
     assert seen["content_type"] == "audio/webm"
 
 
 # ---------- Mock mode (no keys) ----------
+def test_transcribe_without_a_provider_says_so():
+    # No key: the server has no speech engine and must not invent a text.
+    assert client.get("/health").json()["speech_provider"] == "browser"
+    response = client.post(
+        "/transcribe", files={"audio": ("a.webm", b"123", "audio/webm")}
+    )
+    assert response.status_code == 503
+    assert "browser" in response.json()["detail"]
+
+
+def test_empty_provider_setting_means_auto(monkeypatch):
+    monkeypatch.setenv("EMOTION_PROVIDER", "")
+    monkeypatch.setenv("SPEECH_PROVIDER", "")
+    assert speech_service.provider_name() == "browser"
+    assert emotion_service.provider_name() in ("local", "mock")
+
+
 def test_mock_mode(monkeypatch):
+    monkeypatch.setenv("EMOTION_PROVIDER", "mock")
+    monkeypatch.setenv("SPEECH_PROVIDER", "mock")
     monkeypatch.setenv("MOCK_EMOTION", "anger")
     response = client.post(
         "/emotion", files={"image": ("f.jpg", b"123", "image/jpeg")}
@@ -145,14 +165,14 @@ def test_empty_upload_rejected():
 
 # ---------- Tolerant wake word ----------
 @pytest.mark.parametrize("text", [
-    "Jarvis tec precio del bitcoin",
-    "yarvis tek precio del bitcoin",
-    "JarvisTEC, precio del bitcoin",
+    "Jarvis tec bitcoin price",
+    "yarvis tek bitcoin price",
+    "JarvisTEC, bitcoin price",
 ])
 def test_wake_word_variants(text):
     cleaned, found = strip_wake_word(text)
     assert found
-    assert cleaned == "precio del bitcoin"
+    assert cleaned == "bitcoin price"
 
 
 def test_no_false_wake_word():
