@@ -1,4 +1,5 @@
 """Adapter of the wine quality model."""
+import re
 from typing import Any
 
 import joblib
@@ -7,15 +8,18 @@ import pandas as pd
 from ..base import BaseModel
 from .schema import WineInputs
 
-# Class labels of the model -> Spanish words used in the spoken reply.
-SPOKEN_CLASSES = {"low": "baja", "medium": "media", "high": "alta"}
+# Whole words only: a substring check would match "preferred".
+TYPE_PATTERNS = {
+    "red": re.compile(r"\bred\b"),
+    "white": re.compile(r"\bwhite\b"),
+}
 
 
 class Wine(BaseModel):
     """Classifies wine quality as low, medium or high."""
 
     name = "wine"
-    title = "Calidad del vino"
+    title = "Wine quality"
     description = (
         "Classifies wine quality (low, medium or high) from its "
         "physicochemical properties. Random Forest; see "
@@ -23,27 +27,37 @@ class Wine(BaseModel):
     )
     task_type = "classification"
     keywords = [
-        "calidad del vino",
-        "clasificar vino",
-        "que tan bueno es este vino",
-        "vino",
+        "wine quality",
+        "quality of the wine",
+        "classify wine",
+        "how good is this wine",
+        "wine",
     ]
     input_schema = WineInputs
-    # Training median/mode, taken from artifacts/wine.meta.json.
+    # A real white wine of the held-out test set, rated high quality by
+    # the tasters (a clear case). The training medians are in
+    # artifacts/wine.meta.json.
     default_input = {
         "type": "white",
-        "fixed_acidity": 7.0,
+        "fixed_acidity": 7.3,
         "volatile_acidity": 0.3,
-        "citric_acid": 0.31,
-        "residual_sugar": 2.8,
-        "chlorides": 0.047,
-        "free_sulfur_dioxide": 28.0,
-        "total_sulfur_dioxide": 117.0,
-        "density": 0.995,
-        "ph": 3.22,
-        "sulphates": 0.51,
-        "alcohol": 10.4,
+        "citric_acid": 0.34,
+        "residual_sugar": 2.7,
+        "chlorides": 0.044,
+        "free_sulfur_dioxide": 34.0,
+        "total_sulfur_dioxide": 108.0,
+        "density": 0.99105,
+        "ph": 3.36,
+        "sulphates": 0.53,
+        "alcohol": 12.8,
     }
+
+    def inputs_from_command(self, text: str) -> dict[str, Any]:
+        """Pick the wine type when the command names it ("red wine")."""
+        for wine_type, pattern in TYPE_PATTERNS.items():
+            if pattern.search(text):
+                return {"type": wine_type}
+        return {}
 
     def load(self) -> None:
         self.pipeline = joblib.load(self.artifact_path())
@@ -66,6 +80,6 @@ class Wine(BaseModel):
         quality = result["quality"]
         percent = round(result["probabilities"][quality] * 100)
         return (
-            f"Estimo que ese vino es de calidad {SPOKEN_CLASSES[quality]}, "
-            f"con una probabilidad del {percent} %."
+            f"I estimate this wine is of {quality} quality, "
+            f"with a probability of {percent}%."
         )

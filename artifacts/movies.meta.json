@@ -1,0 +1,162 @@
+{
+  "model": "Item-based collaborative filtering (cosine with shrinkage)",
+  "best_with_user_history_on_validation": "Truncated SVD",
+  "best_neighbor_table_on_validation": "Item-based CF",
+  "hyperparameters": {
+    "center": false,
+    "shrink": 100,
+    "min_ratings": 5,
+    "min_co_ratings": 3,
+    "saved_neighbors": 20,
+    "bayesian_prior": 200
+  },
+  "task": "recommendation",
+  "features": [
+    "title",
+    "top_n"
+  ],
+  "evaluation": {
+    "protocol": "random 20% of each user's ratings held out; top-10 lists; relevant = rating >= 4.0",
+    "users_evaluated": 655,
+    "seed": 42
+  },
+  "test_metrics": {
+    "Popularity (most rated)": {
+      "hit_rate@10": 0.5603,
+      "precision@10": 0.1224,
+      "recall@10": 0.112,
+      "ndcg@10": 0.1651,
+      "coverage": 0.0061
+    },
+    "Content-based (genres)": {
+      "hit_rate@10": 0.0498,
+      "precision@10": 0.0053,
+      "recall@10": 0.0039,
+      "ndcg@10": 0.0064,
+      "coverage": 0.7565
+    },
+    "Item-based CF": {
+      "hit_rate@10": 0.5066,
+      "precision@10": 0.1004,
+      "recall@10": 0.1068,
+      "ndcg@10": 0.1395,
+      "coverage": 0.2012
+    },
+    "Truncated SVD": {
+      "hit_rate@10": 0.3704,
+      "precision@10": 0.062,
+      "recall@10": 0.0712,
+      "ndcg@10": 0.0857,
+      "coverage": 0.2903
+    }
+  },
+  "test_metrics_user_history": {
+    "Random": {
+      "hit_rate@10": 0.0153,
+      "precision@10": 0.0015,
+      "recall@10": 0.0004,
+      "ndcg@10": 0.0012,
+      "coverage": 0.4714
+    },
+    "Popularity (most rated)": {
+      "hit_rate@10": 0.5603,
+      "precision@10": 0.1224,
+      "recall@10": 0.112,
+      "ndcg@10": 0.1651,
+      "coverage": 0.0061
+    },
+    "Bayesian average": {
+      "hit_rate@10": 0.5557,
+      "precision@10": 0.1153,
+      "recall@10": 0.105,
+      "ndcg@10": 0.1433,
+      "coverage": 0.0048
+    },
+    "Content-based (genres)": {
+      "hit_rate@10": 0.0626,
+      "precision@10": 0.0064,
+      "recall@10": 0.0035,
+      "ndcg@10": 0.0064,
+      "coverage": 0.1771
+    },
+    "Item-based CF": {
+      "hit_rate@10": 0.7206,
+      "precision@10": 0.1979,
+      "recall@10": 0.189,
+      "ndcg@10": 0.2691,
+      "coverage": 0.0435
+    },
+    "Truncated SVD": {
+      "hit_rate@10": 0.7527,
+      "precision@10": 0.1986,
+      "recall@10": 0.2057,
+      "ndcg@10": 0.2759,
+      "coverage": 0.0448
+    }
+  },
+  "parameters_per_approach": {
+    "Popularity (most rated)": {},
+    "Content-based (genres)": {},
+    "Item-based CF": {
+      "center": false,
+      "shrink": 100
+    },
+    "Truncated SVD": {
+      "n_components": 30
+    }
+  },
+  "parameters_per_approach_user_history": {
+    "Truncated SVD": {
+      "n_components": 30
+    },
+    "Item-based CF": {
+      "center": false,
+      "shrink": 10,
+      "k": 200,
+      "profile": "liked"
+    },
+    "Popularity (most rated)": {},
+    "Bayesian average": {
+      "prior": 200
+    },
+    "Content-based (genres)": {
+      "profile": "liked"
+    },
+    "Random": {}
+  },
+  "counts": {
+    "users": 668,
+    "movies": 10329,
+    "ratings": 105339,
+    "movies_with_neighbors": 3855,
+    "title_keys": 22660
+  },
+  "default_input": {
+    "title": "Toy Story (1995)",
+    "top_n": 5
+  },
+  "default_recommendations": [
+    {
+      "title": "Star Wars: Episode IV - A New Hope (1977)",
+      "score": 0.3888
+    },
+    {
+      "title": "Star Wars: Episode VI - Return of the Jedi (1983)",
+      "score": 0.3748
+    },
+    {
+      "title": "Raiders of the Lost Ark (Indiana Jones and the Raiders of the Lost Ark) (1981)",
+      "score": 0.3377
+    },
+    {
+      "title": "Jurassic Park (1993)",
+      "score": 0.333
+    },
+    {
+      "title": "Independence Day (a.k.a. ID4) (1996)",
+      "score": 0.3301
+    }
+  ],
+  "artifact_bytes": 899672,
+  "sklearn_version": "1.9.1"
+}

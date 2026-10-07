@@ -1,0 +1,73 @@
+{
+  "model": "Gradient Boosting (tuned threshold)",
+  "hyperparameters": {
+    "subsample": 1.0,
+    "n_estimators": 300,
+    "min_samples_leaf": 20,
+    "max_depth": 2,
+    "learning_rate": 0.03,
+    "decision_threshold": 0.299
+  },
+  "task": "classification",
+  "features": [
+    "gender",
+    "senior_citizen",
+    "partner",
+    "dependents",
+    "tenure",
+    "phone_service",
+    "multiple_lines",
+    "internet_service",
+    "online_security",
+    "online_backup",
+    "device_protection",
+    "tech_support",
+    "streaming_tv",
+    "streaming_movies",
+    "contract",
+    "paperless_billing",
+    "payment_method",
+    "monthly_charges",
+    "total_charges"
+  ],
+  "test_metrics": {
+    "accuracy": 0.7573,
+    "f1_macro": 0.7237,
+    "precision_macro": 0.715,
+    "recall_macro": 0.7614,
+    "f1_churn": 0.6275,
+    "precision_churn": 0.5294,
+    "recall_churn": 0.7701,
+    "roc_auc": 0.8456,
+    "average_precision": 0.6615,
+    "brier_score": 0.1356
+  },
+  "baseline_test_f1_macro": 0.4235,
+  "decision_threshold": 0.299,
+  "default_input": {
+    "gender": "Male",
+    "senior_citizen": 0,
+    "partner": "No",
+    "dependents": "No",
+    "tenure": 29,
+    "phone_service": "Yes",
+    "multiple_lines": "No",
+    "internet_service": "Fiber optic",
+    "online_security": "No",
+    "online_backup": "No",
+    "device_protection": "No",
+    "tech_support": "No",
+    "streaming_tv": "No",
+    "streaming_movies": "No",
+    "contract": "Month-to-month",
+    "paperless_billing": "Yes",
+    "payment_method": "Electronic check",
+    "monthly_charges": 70.5,
+    "total_charges": 1394.92
+  },
+  "sklearn_version": "1.9.1",
+  "classes": {
+    "0": "No (stays)",
+    "1": "Yes (churns)"
+  }
+}

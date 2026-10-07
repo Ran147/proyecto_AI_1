@@ -1,0 +1,37 @@
+{
+  "model": "Ridge",
+  "hyperparameters": {
+    "alpha": 0.01
+  },
+  "task": "regression",
+  "features": [
+    "abdomen_cm",
+    "weight_kg"
+  ],
+  "test_metrics": {
+    "rmse": 4.2676,
+    "mae": 3.2275,
+    "r2": 0.6716
+  },
+  "default_input": {
+    "abdomen_cm": 90.85,
+    "weight_kg": 78.58
+  },
+  "sklearn_version": "1.9.1",
+  "target": "body fat, % of body weight",
+  "baseline_test_rmse": 7.4509,
+  "training_ranges": {
+    "abdomen_cm": [
+      70.4,
+      126.2
+    ],
+    "weight_kg": [
+      56.7,
+      119.18
+    ]
+  },
+  "target_training_range": [
+    0.7,
+    47.5
+  ]
+}

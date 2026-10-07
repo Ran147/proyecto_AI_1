@@ -21,13 +21,13 @@ class BaseModel(ABC):
     # ---------- Metadata ----------
     # Unique identifier used in /models/{name}: lowercase, no spaces.
     name: str = ""
-    # Display name shown in the UI (Spanish, user-facing).
+    # Display name shown in the UI.
     title: str = ""
     # Technical description for API consumers.
     description: str = ""
     # "classification" | "regression" | "time_series" | "recommendation"
     task_type: str = ""
-    # Spanish voice command phrases, e.g. ["precio del bitcoin"].
+    # Voice command phrases, lowercase, e.g. ["bitcoin price"].
     keywords: list[str] = []
     # True only for toy logic that is NOT a trained model.
     is_demo: bool = False
@@ -64,8 +64,16 @@ class BaseModel(ABC):
     def predict(self, inputs: dict[str, Any]) -> dict[str, Any]:
         """Take validated inputs and return a JSON-serializable dict."""
 
+    def inputs_from_command(self, text: str) -> dict[str, Any]:
+        """Extract inputs said in a command, e.g. "organic avocado".
+
+        ``text`` is the normalized command (lowercase, no accents, no wake
+        word). Optional: by default a command carries no data.
+        """
+        return {}
+
     def speak(self, result: dict[str, Any]) -> str:
-        """Return the Spanish sentence JarvisTEC says to the user."""
+        """Return the sentence JarvisTEC says to the user."""
         return str(result)
 
     def describe_inputs(self) -> dict[str, str]:
@@ -80,6 +88,21 @@ class BaseModel(ABC):
             )
         return fields
 
+    def input_options(self) -> dict[str, list[Any]]:
+        """Return the allowed values of the inputs limited to a fixed set."""
+        if self.input_schema is None:
+            return {}
+        properties = self.input_schema.model_json_schema().get(
+            "properties", {}
+        )
+        options = {}
+        for field, spec in properties.items():
+            # Optional fields wrap the enum in an "anyOf" list.
+            for variant in [spec, *spec.get("anyOf", [])]:
+                if "enum" in variant:
+                    options[field] = variant["enum"]
+        return options
+
     def info(self) -> dict[str, Any]:
         """Return the public metadata exposed by GET /models."""
         return {
@@ -90,5 +113,6 @@ class BaseModel(ABC):
             "demo": self.is_demo,
             "keywords": self.keywords,
             "input_fields": self.describe_inputs(),
+            "input_options": self.input_options(),
             "default_input": self.default_input,
         }

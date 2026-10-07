@@ -7,7 +7,7 @@
 
 - Task: classification | regression | time series | recommendation
 - What it answers, and for whom:
-- Voice commands (Spanish): "JarvisTEC, ..."
+- Voice commands: "JarvisTEC, ..."
 
 ## Dataset
 

@@ -12,11 +12,13 @@ venv/
 # Jupyter
 .ipynb_checkpoints/
 
-# Datasets and trained models (regenerated from training/)
+# Datasets: not redistributed. Fetch them with scripts/download_datasets.py.
 data/*
 !data/.gitkeep
-artifacts/*
-!artifacts/.gitkeep
+
+# Trained models ARE committed (artifacts/*.joblib, *.meta.json, *.onnx) so
+# the application runs right after cloning. Only partial downloads are ignored.
+artifacts/*.part
 
 # OS
 .DS_Store

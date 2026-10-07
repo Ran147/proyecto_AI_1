@@ -1,0 +1,130 @@
+{
+  "model": "Random Forest on returns",
+  "hyperparameters": {
+    "max_depth": 6,
+    "max_features": 0.33,
+    "min_samples_leaf": 50
+  },
+  "task": "time_series",
+  "target": "next-day close, USD",
+  "target_kind": "log_return",
+  "features": [
+    "return_lag_1",
+    "return_lag_2",
+    "return_lag_3",
+    "return_lag_4",
+    "return_lag_5",
+    "return_lag_6",
+    "return_lag_7",
+    "return_mean_7",
+    "return_std_7",
+    "gap_sma_7",
+    "return_mean_30",
+    "return_std_30",
+    "gap_sma_30",
+    "day_of_week"
+  ],
+  "feature_columns": [
+    "close_lag_1",
+    "close_lag_2",
+    "close_lag_3",
+    "close_lag_4",
+    "close_lag_5",
+    "close_lag_6",
+    "close_lag_7",
+    "return_lag_1",
+    "return_lag_2",
+    "return_lag_3",
+    "return_lag_4",
+    "return_lag_5",
+    "return_lag_6",
+    "return_lag_7",
+    "return_mean_7",
+    "return_std_7",
+    "gap_sma_7",
+    "return_mean_30",
+    "return_std_30",
+    "gap_sma_30",
+    "day_of_week"
+  ],
+  "history_days": 31,
+  "test_metrics": {
+    "rmse": 69.9825,
+    "mae": 39.1822,
+    "mape": 2.4405,
+    "r2": 0.9903,
+    "directional_accuracy": 0.625
+  },
+  "baseline_test_metrics": {
+    "rmse": 69.7329,
+    "mae": 40.0305,
+    "mape": 2.4977,
+    "r2": 0.9903
+  },
+  "beats_naive_on_test": false,
+  "test_period": [
+    "2016-09-30",
+    "2017-07-31"
+  ],
+  "kaggle_week_metrics": {
+    "model": {
+      "rmse": 167.3946,
+      "mae": 132.5809,
+      "mape": 4.316,
+      "r2": 0.5785,
+      "directional_accuracy": 0.5714
+    },
+    "naive": {
+      "rmse": 168.2244,
+      "mae": 130.1257,
+      "mape": 4.2331,
+      "r2": 0.5743
+    }
+  },
+  "trained_on": [
+    "2013-05-29",
+    "2017-07-31"
+  ],
+  "default_input": {
+    "last_price": 2875.34
+  },
+  "history": {
+    "last_date": "2017-07-31",
+    "forecast_date": "2017-08-01",
+    "closes": [
+      2434.55,
+      2506.47,
+      2564.06,
+      2601.64,
+      2601.99,
+      2608.56,
+      2518.66,
+      2571.34,
+      2518.44,
+      2372.56,
+      2337.79,
+      2398.84,
+      2357.9,
+      2233.34,
+      1998.86,
+      1929.82,
+      2228.41,
+      2318.88,
+      2273.43,
+      2817.6,
+      2667.76,
+      2810.12,
+      2730.4,
+      2754.86,
+      2576.48,
+      2529.45,
+      2671.78,
+      2809.01,
+      2726.45,
+      2757.18,
+      2875.34
+    ]
+  },
+  "expected_default_prediction": 2889.08,
+  "sklearn_version": "1.9.1"
+}

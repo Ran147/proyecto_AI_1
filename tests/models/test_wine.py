@@ -1,7 +1,7 @@
 """Trained ``wine`` model.
 
 Tests that run the model are skipped when artifacts/wine.joblib is missing
-(it is git-ignored; training/wine/notebook.ipynb generates it).
+(training/wine/notebook.ipynb generates it).
 """
 import json
 
@@ -77,13 +77,41 @@ def test_predict_partial_input_uses_defaults():
 
 @needs_artifact
 @pytest.mark.parametrize("text", [
-    "JarvisTEC, calidad del vino",
-    "Jarvis tec clasificar vino",
-    "JarvisTEC qué tan bueno es este vino",
+    "JarvisTEC, wine quality",
+    "JarvisTEC quality of the wine",
+    "Jarvis tec classify wine",
+    "Jarvis tec how good is this wine",
+    "JarvisTEC, wine",
 ])
 def test_voice_command_runs_model(text):
     body = client.post("/command", json={"text": text}).json()
     assert body["matched"]
     assert body["model"] == "wine"
     assert body["result"]["quality"] in CLASSES
-    assert "calidad" in body["message"]
+    assert "quality" in body["message"]
+    assert "probability" in body["message"]
+
+
+def test_spoken_wine_type_needs_the_whole_word():
+    wine = Wine()
+    assert wine.inputs_from_command("wine quality red") == {
+        "type": "red"
+    }
+    assert wine.inputs_from_command("classify white wine") == {
+        "type": "white"
+    }
+    # "preferred" and "whitewashed" only contain the words.
+    assert wine.inputs_from_command("wine quality preferred") == {}
+    assert wine.inputs_from_command("whitewashed wine quality") == {}
+
+
+@needs_artifact
+def test_voice_command_sets_spoken_wine_type():
+    def spoken_type(text):
+        body = client.post("/command", json={"text": text}).json()
+        assert body["model"] == "wine"
+        return body["inputs"]["type"]
+
+    assert Wine.default_input["type"] == "white"
+    assert spoken_type("JarvisTEC wine quality red") == "red"
+    assert spoken_type("JarvisTEC wine quality preferred") == "white"

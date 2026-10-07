@@ -1,0 +1,51 @@
+{
+  "model": "Random Forest",
+  "hyperparameters": {
+    "n_estimators": 400,
+    "min_samples_leaf": 2,
+    "max_features": "sqrt",
+    "max_depth": null,
+    "class_weight": "balanced"
+  },
+  "task": "classification",
+  "features": [
+    "type",
+    "fixed_acidity",
+    "volatile_acidity",
+    "citric_acid",
+    "residual_sugar",
+    "chlorides",
+    "free_sulfur_dioxide",
+    "total_sulfur_dioxide",
+    "density",
+    "ph",
+    "sulphates",
+    "alcohol"
+  ],
+  "test_metrics": {
+    "accuracy": 0.591,
+    "f1_macro": 0.5897,
+    "precision_macro": 0.5801,
+    "recall_macro": 0.6118
+  },
+  "default_input": {
+    "fixed_acidity": 7.0,
+    "volatile_acidity": 0.3,
+    "citric_acid": 0.31,
+    "residual_sugar": 2.8,
+    "chlorides": 0.047,
+    "free_sulfur_dioxide": 28.0,
+    "total_sulfur_dioxide": 117.0,
+    "density": 0.995,
+    "ph": 3.22,
+    "sulphates": 0.51,
+    "alcohol": 10.4,
+    "type": "white"
+  },
+  "sklearn_version": "1.9.1",
+  "classes": [
+    "high",
+    "low",
+    "medium"
+  ]
+}

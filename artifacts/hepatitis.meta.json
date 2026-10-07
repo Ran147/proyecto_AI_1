@@ -1,0 +1,61 @@
+{
+  "model": "Random Forest (balanced) | log",
+  "hyperparameters": {
+    "n_estimators": 200,
+    "max_depth": null,
+    "min_samples_leaf": 1,
+    "max_features": "sqrt",
+    "class_weight": "balanced"
+  },
+  "preprocessing": "log",
+  "task": "classification",
+  "features": [
+    "age",
+    "sex",
+    "alb",
+    "alp",
+    "alt",
+    "ast",
+    "bil",
+    "che",
+    "chol",
+    "crea",
+    "ggt",
+    "prot"
+  ],
+  "test_metrics": {
+    "accuracy": 0.9262,
+    "f1_macro": 0.5879,
+    "balanced_accuracy": 0.5893,
+    "precision_macro": 0.5966,
+    "recall_macro": 0.5893
+  },
+  "baseline_test_f1_macro": 0.2336,
+  "test_support": {
+    "blood_donor": 107,
+    "cirrhosis": 6,
+    "hepatitis": 5,
+    "fibrosis": 4
+  },
+  "default_input": {
+    "age": 46,
+    "alb": 41.85,
+    "alp": 65.4,
+    "alt": 22.5,
+    "ast": 26.05,
+    "bil": 7.45,
+    "che": 8.225,
+    "chol": 5.29,
+    "crea": 76.45,
+    "ggt": 23.25,
+    "prot": 72.0,
+    "sex": "m"
+  },
+  "sklearn_version": "1.9.1",
+  "classes": [
+    "blood_donor",
+    "cirrhosis",
+    "fibrosis",
+    "hepatitis"
+  ]
+}

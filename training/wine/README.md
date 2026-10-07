@@ -6,8 +6,8 @@
   `high` = 7-9)
 - What it answers: the expected sensory quality of a wine from its
   physicochemical properties.
-- Voice commands (Spanish): "JarvisTEC, calidad del vino", "JarvisTEC,
-  clasificar vino", "JarvisTEC, qué tan bueno es este vino"
+- Voice commands: "JarvisTEC, wine quality", "JarvisTEC, classify wine",
+  "JarvisTEC, how good is this wine"
 
 ## Dataset
 
@@ -42,7 +42,7 @@
 1. Download the Kaggle CSV to `data/wine_quality/winequalityN.csv`.
 2. Open `training/wine/notebook.ipynb` with the `.venv` kernel and run every
    cell (about 1-2 minutes).
-3. It generates `artifacts/wine.joblib` (about 50 MB, git-ignored) and
+3. It generates `artifacts/wine.joblib` (about 12 MB compressed, committed) and
    `artifacts/wine.meta.json`.
 
 ## Evaluation (test set, 1066 wines)

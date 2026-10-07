@@ -1,0 +1,70 @@
+{
+  "model": "Random Forest (balanced)",
+  "hyperparameters": {
+    "n_estimators": 400,
+    "min_samples_leaf": 5,
+    "max_features": "sqrt",
+    "max_depth": 8,
+    "class_weight": "balanced_subsample"
+  },
+  "task": "classification",
+  "features": [
+    "age",
+    "sex",
+    "ascites",
+    "hepatomegaly",
+    "spiders",
+    "edema",
+    "bilirubin",
+    "cholesterol",
+    "albumin",
+    "copper",
+    "alk_phos",
+    "sgot",
+    "triglycerides",
+    "platelets",
+    "prothrombin"
+  ],
+  "test_metrics": {
+    "accuracy": 0.506,
+    "f1_macro": 0.443,
+    "precision_macro": 0.4448,
+    "recall_macro": 0.445,
+    "balanced_accuracy": 0.445,
+    "within_one_stage": 0.8916,
+    "mae_stages": 0.6024,
+    "quadratic_kappa": 0.4856
+  },
+  "baseline_test_metrics": {
+    "accuracy": 0.3735,
+    "f1_macro": 0.136,
+    "balanced_accuracy": 0.25,
+    "within_one_stage": 0.9518,
+    "mae_stages": 0.6747,
+    "quadratic_kappa": 0.0
+  },
+  "default_input": {
+    "age": 51.2,
+    "bilirubin": 1.4,
+    "cholesterol": 309.0,
+    "albumin": 3.52,
+    "copper": 73.0,
+    "alk_phos": 1282.0,
+    "sgot": 116.25,
+    "triglycerides": 109.5,
+    "platelets": 248.0,
+    "prothrombin": 10.6,
+    "sex": "F",
+    "ascites": "N",
+    "hepatomegaly": "Y",
+    "spiders": "N",
+    "edema": "N"
+  },
+  "sklearn_version": "1.9.1",
+  "classes": [
+    1,
+    2,
+    3,
+    4
+  ]
+}

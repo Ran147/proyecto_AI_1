@@ -1,0 +1,124 @@
+{
+  "model": "Ridge",
+  "hyperparameters": {
+    "alpha": 0.01
+  },
+  "task": "time_series",
+  "target": "average price of the next week, USD per avocado",
+  "features": [
+    "lag_1",
+    "lag_2",
+    "lag_3",
+    "lag_4",
+    "roll_mean_4",
+    "diff_1",
+    "week_sin",
+    "week_cos",
+    "type"
+  ],
+  "n_lags": 4,
+  "trained_on": "all (region, type) series; refitted on all weeks",
+  "served_series": "TotalUS",
+  "train_weeks": [
+    "2015-02-01",
+    "2017-08-06"
+  ],
+  "test_weeks": [
+    "2017-08-13",
+    "2018-03-25"
+  ],
+  "test_metrics": {
+    "rmse": 0.1531,
+    "mae": 0.1114,
+    "mape": 7.7454,
+    "r2": 0.8501
+  },
+  "naive_test_metrics": {
+    "rmse": 0.1636,
+    "mae": 0.1124,
+    "mape": 7.9833,
+    "r2": 0.8288
+  },
+  "test_metrics_served_series": {
+    "rmse": 0.0794,
+    "mae": 0.0618,
+    "mape": 4.5692,
+    "r2": 0.9383
+  },
+  "naive_test_metrics_served_series": {
+    "rmse": 0.0764,
+    "mae": 0.0591,
+    "mape": 4.4945,
+    "r2": 0.9429
+  },
+  "default_input": {
+    "type": "conventional"
+  },
+  "history": {
+    "region": "TotalUS",
+    "last_date": "2018-03-25",
+    "dates": [
+      "2018-02-04",
+      "2018-02-11",
+      "2018-02-18",
+      "2018-02-25",
+      "2018-03-04",
+      "2018-03-11",
+      "2018-03-18",
+      "2018-03-25"
+    ],
+    "prices": {
+      "conventional": [
+        0.87,
+        0.97,
+        1.08,
+        1.06,
+        1.07,
+        1.09,
+        1.05,
+        1.03
+      ],
+      "organic": [
+        1.53,
+        1.56,
+        1.52,
+        1.57,
+        1.52,
+        1.52,
+        1.54,
+        1.55
+      ]
+    }
+  },
+  "forecast_date": "2018-04-01",
+  "default_features": {
+    "conventional": {
+      "lag_1": 1.03,
+      "lag_2": 1.05,
+      "lag_3": 1.09,
+      "lag_4": 1.07,
+      "roll_mean_4": 1.06,
+      "diff_1": -0.020000000000000018,
+      "week_sin": 1.0,
+      "week_cos": -1.6081226496766366e-16,
+      "type": "conventional"
+    },
+    "organic": {
+      "lag_1": 1.55,
+      "lag_2": 1.54,
+      "lag_3": 1.52,
+      "lag_4": 1.52,
+      "roll_mean_4": 1.5325,
+      "diff_1": 0.010000000000000009,
+      "week_sin": 1.0,
+      "week_cos": -1.6081226496766366e-16,
+      "type": "organic"
+    }
+  },
+  "expected_default_prediction": 1.0523,
+  "expected_predictions": {
+    "conventional": 1.0523,
+    "organic": 1.5496
+  },
+  "sklearn_version": "1.9.1"
+}
