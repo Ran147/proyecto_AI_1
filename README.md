@@ -22,16 +22,20 @@ uvicorn backend.main:app --reload
 - Interactive API documentation (Swagger): http://localhost:8000/docs
 - Status and registered models: http://localhost:8000/health
 
-That is all: the ten trained models and the emotion networks are committed in
-`artifacts/`, and no API key is needed.
+That is all: the ten trained models, the emotion networks and the speech
+model are committed in `artifacts/`, and no API key is needed.
 
-- **Voice** is transcribed by the browser's own speech recognition (Web Speech
-  API, Chrome or Edge, internet connection required). Only the text reaches
-  the backend.
+- **Voice** has two engines, switched with the **Speech** button in the
+  header. The default is the browser's own speech recognition (Web Speech
+  API, Chrome or Edge, needs internet). The other is a local model on the
+  server (Vosk, offline, any browser): the page records WAV audio and
+  `POST /transcribe` returns the text. If the browser's recognition fails,
+  the page switches to the local model by itself.
 - **Emotion** runs on a local model in the backend: the YuNet face detector,
   then the FER+ and HSEmotion expression classifiers averaged, through OpenCV.
-- With `GOOGLE_API_KEY` in `.env` (copy `.env.example`), both switch to the
-  Google Cloud APIs; see [docs/GOOGLE_SETUP.md](docs/GOOGLE_SETUP.md).
+- With `GOOGLE_API_KEY` in `.env` (copy `.env.example`), emotion and
+  `POST /transcribe` switch to the Google Cloud APIs; see
+  [docs/GOOGLE_SETUP.md](docs/GOOGLE_SETUP.md).
 
 ## Using it
 
@@ -70,10 +74,10 @@ in the list. Everything is in English.
 | POST | `/models/{name}/predict` | Run a model. Body: `{"inputs": {...}}`; missing inputs take defaults |
 | POST | `/command` | Text to the right model. Body: `{"text": "JarvisTEC wine quality"}` |
 | POST | `/emotion` | Image (field `image`) to dominant emotion and scores |
-| POST | `/transcribe` | Audio (field `audio`) to text; needs a server speech provider (Google) |
+| POST | `/transcribe` | Audio (field `audio`, WAV) to text, with the local model or Google |
 
-Without a Google key `POST /transcribe` answers 503 and explains that the web
-interface transcribes in the browser; it never returns an invented text.
+`POST /transcribe` never returns an invented text: if the server has neither
+the local model nor a Google key, it answers 503 and says so.
 
 ## Models
 
@@ -113,7 +117,7 @@ frontend/               HTML, CSS and JavaScript interface
 training/               offline training; never imported by the backend
   _template/            notebook with the 6 rubric sections + model card template
   <name>/               notebook and model card of each model
-artifacts/              trained models (.joblib + .meta.json) and emotion networks (.onnx)
+artifacts/              trained models (.joblib + .meta.json), emotion networks (.onnx), speech model
 scripts/                dataset and model downloads, emotion evaluation, timing
 tests/                  pytest suite; tests/models/ has one file per model
 data/                   datasets; git-ignored (scripts/download_datasets.py)
@@ -123,7 +127,7 @@ docs/                   project documentation and the written report (docs/repor
 ## Development
 
 ```bash
-python -m pytest                     # 300+ tests
+python -m pytest                     # 315 tests
 pip install ruff && ruff check backend tests scripts   # PEP 8 lint (79 columns)
 ```
 
@@ -136,8 +140,9 @@ python scripts/download_datasets.py
 jupyter nbconvert --to notebook --execute --inplace training/wine/notebook.ipynb
 ```
 
-Other scripts: `scripts/download_emotion_models.py` (re-fetches the emotion
-networks, with hash check), `scripts/evaluate_emotion_model.py` (emotion
+Other scripts: `scripts/download_emotion_models.py` and
+`scripts/download_speech_model.py` (re-fetch the emotion networks and the
+speech model, with hash check), `scripts/evaluate_emotion_model.py` (emotion
 classifiers on FER-2013), `scripts/measure_response_times.py`.
 
 ## Documentation

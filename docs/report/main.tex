@@ -57,7 +57,7 @@ JarvisTEC is a personal assistant that takes instructions by voice or text, watc
 \item[Web interface.] A page written in HTML, CSS and JavaScript with no dependencies, styled as a reactor after the reference interface of the assignment. It captures camera frames (WebRTC), listens to the microphone, animates the reactor with the real microphone volume and reads the answer with the browser's speech synthesis. It lists the available commands and, for each model, shows a form generated automatically from the model's inputs, so the user can query the model with their own values.
 \item[REST API.] A FastAPI service that exposes every resource of the system (Table~\ref{tab:api}).
 \item[Emotion agent.] Takes an image and returns the dominant emotion and a probability per emotion. It runs locally in the service with pretrained neural networks: a face detector and two facial expression classifiers whose probabilities are averaged. It needs no API key or external service.
-\item[Speech agent.] Turns the user's speech into text with the browser's speech recognition (the Web Speech API of Chrome and Edge, which sends the audio to the browser vendor's speech service), in English. The service also keeps a Google Cloud Speech-to-Text provider, which is activated by configuring an API key.
+\item[Speech agent.] Turns the user's speech into text, in English, with either of two engines the user can switch between: the browser's speech recognition (the Web Speech API of Chrome and Edge) or a local model in the service (Vosk, an offline recognizer), which receives the recorded audio through the API. The service also keeps a Google Cloud Speech-to-Text provider, which is activated by configuring an API key.
 \item[Command router.] Normalizes the text (lowercase, no accents or punctuation), tolerates variants of the wake word (``Jarvis TEC'', ``yarvis tek'') and compares the text with the phrases of each model, first by exact match and then by fuzzy similarity.
 \item[Model orchestrator.] The single entry point to the models: it validates the inputs against each model's schema, loads the trained model once, runs it and builds the answer. If one model is unavailable, the others keep working.
 \item[Ten machine learning models.] Each has a training notebook that follows the six sections of the rubric, a trained artifact stored in the repository and an inference adapter.
@@ -77,7 +77,7 @@ GET & \code{/models/\{name\}} & Metadata of one model \\
 POST & \code{/models/\{name\}/predict} & Runs a model with the given inputs; missing inputs take their default value \\
 POST & \code{/command} & Takes the text of an instruction, routes it to the matching model and runs it \\
 POST & \code{/emotion} & Takes an image and returns the dominant emotion \\
-POST & \code{/transcribe} & Takes an audio clip and returns its text. It needs a speech provider on the server (Google); without one it answers 503 and explains that the interface transcribes in the browser \\
+POST & \code{/transcribe} & Takes an audio clip (WAV) and returns its text and a confidence, with the local speech model or with Google \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -85,7 +85,7 @@ POST & \code{/transcribe} & Takes an audio clip and returns its text. It needs a
 \subsection{Flow of an instruction}
 
 \begin{enumerate}
-\item The user presses the microphone button and speaks. The browser transcribes the speech and shows the words as it recognizes them; listening stops by itself after a pause.
+\item The user presses the microphone button and speaks. With the browser engine, the browser transcribes the speech and shows the words as it recognizes them; with the local engine, the page records the audio and sends it to \code{/transcribe}.
 \item The transcribed text is sent to \code{/command}. In parallel, if the camera is on, frames are sent to \code{/emotion}.
 \item The router identifies the model. Three commands also take data from the sentence itself (``red wine quality'', ``organic avocado price'', ``recommend me a movie like Jurassic Park''); the remaining inputs come from the model's form or from its default values.
 \item The orchestrator validates the inputs, runs the model and returns the result together with a sentence for the user.
@@ -146,9 +146,9 @@ The combination was chosen on this same test set, so Table~\ref{tab:emotions} de
 
 \subsection{Speech recognition}
 
-The interface uses the browser's Web Speech API with language \code{en-US}. The browser captures the audio, transcribes it with its vendor's speech service and delivers partial and final results; only the final text reaches the backend, where it is sent to \code{/command}. This option needs no API key or billing account, works in Chrome and Edge and requires an internet connection. Because the transcription of the wake word varies (``Jarvis TEC'', ``Jarvis tech'', ``yarvis tek''), the command router tolerates those variants. The team tested the flow with a real microphone in Chrome.
+Two engines are available and the user switches between them with a button. \textbf{Browser engine.} The interface uses the browser's Web Speech API with language \code{en-US}. The browser captures the audio, transcribes it with its vendor's speech service and delivers partial and final results; only the final text reaches the backend, where it is sent to \code{/command}. It works in Chrome and Edge and requires an internet connection. The team tested this flow with a real microphone in Chrome.
 
-As an alternative, the service includes a Google Cloud Speech-to-Text provider, exposed as \code{POST /transcribe}: the interface records in WebM/Opus format and the service sends the audio with the command phrases as recognition context. It is activated by configuring the API key; without it the endpoint answers with an explicit error instead of a transcription.
+\textbf{Local engine.} The service runs Vosk, an offline recognizer built on the Kaldi toolkit~\cite{povey2011}, with its small English model (40~MB), stored in the repository. The page records the microphone as 16-bit mono WAV at 16~kHz and sends it to \code{POST /transcribe}, which returns the text and the mean confidence of its words. It needs no internet connection and works in any browser; if the browser engine fails, the page switches to this one by itself. It was checked with 15 commands spoken by a synthetic voice: every transcription reached the intended model, in about 0.7~s per command. It has not been measured with real voices; the word error rate published for the model is about 10\,\%, so it is less accurate than the browser engine. Because the transcription of the wake word varies (``Jarvis TEC'', ``Jarvis tech'', ``yarvis tek''), the command router tolerates those variants. Neither engine needs an API key or a billing account. The service also includes a Google Cloud Speech-to-Text provider, activated by configuring an API key.
 
 \subsection{Common architecture of the predictive models}
 
@@ -370,6 +370,8 @@ Several datasets are small (body fat, car price, cirrhosis, hepatitis), so their
 
 \bibitem{penrose1985} K. W. Penrose, A. G. Nelson and A. G. Fisher, ``Generalized body composition prediction equation for men using simple measurement techniques,'' \emph{Medicine and Science in Sports and Exercise}, vol. 17, no. 2, p. 189, 1985.
 
+\bibitem{povey2011} D. Povey et al., ``The Kaldi speech recognition toolkit,'' in \emph{Proc. IEEE Workshop on Automatic Speech Recognition and Understanding (ASRU)}, 2011.
+
 \bibitem{pudaruth2014} S. Pudaruth, ``Predicting the price of used cars using machine learning techniques,'' \emph{International Journal of Information \& Computation Technology}, vol. 4, no. 7, pp. 753--764, 2014.
 
 \bibitem{saito2015} T. Saito and M. Rehmsmeier, ``The precision-recall plot is more informative than the ROC plot when evaluating binary classifiers on imbalanced datasets,'' \emph{PLoS ONE}, vol. 10, no. 3, e0118432, 2015.
@@ -401,7 +403,7 @@ Repository: \url{https://github.com/Ran147/proyecto_AI_1}. To run the system:
 \item Start the service: \code{uvicorn backend.main:app}.
 \end{enumerate}
 
-\sloppy The trained models and the emotion networks are stored in the repository (\code{artifacts/}), so nothing has to be trained or downloaded to run it. To retrain a model, \code{python scripts/download\_datasets.py} fetches the datasets and each notebook in \code{training/} regenerates its model. The interface is served at \code{http://localhost:8000} and the interactive API documentation at \code{/docs}.
+\sloppy The trained models, the emotion networks and the speech model are stored in the repository (\code{artifacts/}), so nothing has to be trained or downloaded to run it. To retrain a model, \code{python scripts/download\_datasets.py} fetches the datasets and each notebook in \code{training/} regenerates its model. The interface is served at \code{http://localhost:8000} and the interactive API documentation at \code{/docs}.
 
 \subsection{Code structure}
 
@@ -409,7 +411,7 @@ Repository: \url{https://github.com/Ran147/proyecto_AI_1}. To run the system:
 \item \code{backend/}: API, orchestrator, command router, emotion and speech services, and one inference package per model.
 \item \code{frontend/}: web interface.
 \item \code{training/}: one notebook and one model card per model.
-\item \code{artifacts/}: the trained models and the emotion networks.
+\item \code{artifacts/}: the trained models, the emotion networks and the speech model.
 \item \code{scripts/}: dataset and model downloads, evaluation of the emotion models and response-time measurement.
 \item \code{tests/}: automated tests of the API, the router, the emotion service and each model.
 \end{itemize}

@@ -19,6 +19,7 @@ data/*
 # Trained models ARE committed (artifacts/*.joblib, *.meta.json, *.onnx) so
 # the application runs right after cloning. Only partial downloads are ignored.
 artifacts/*.part
+artifacts/*.zip
 
 # OS
 .DS_Store

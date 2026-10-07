@@ -19,7 +19,7 @@ trained models are in the repository and no API key is required.
 - Click a command, or press **Speak** and say "JarvisTEC, wine quality".
 - Open **Data** next to a command to run the model with your own values.
 - Turn the camera on and press **Analyze emotion**.
-- `python -m pytest` should report 308 passed.
+- `python -m pytest` should report 315 passed.
 
 If the page looks old (Spanish labels), reload with Ctrl+F5.
 
@@ -28,7 +28,7 @@ If the page looks old (Spanish labels), reload with Ctrl+F5.
 | Decision | Before | Now | Why |
 |---|---|---|---|
 | Language | Code in English, interface and commands in Spanish | Everything in English, including voice commands and spoken answers | Requirement for the delivery |
-| Speech-to-text | Google Cloud (planned: local model) | The browser's speech recognition (Web Speech API) | Google Cloud needs a billing account; the browser needs no key |
+| Speech-to-text | Google Cloud (planned: local model) | Two engines: the browser's speech recognition (default) and a local Vosk model on the server | Google Cloud needs a billing account; neither engine needs a key, and the local one works offline |
 | Emotion | Google Vision (planned: local model) | Local pretrained networks in the backend (YuNet + FER+ + HSEmotion) | Same reason; it also keeps `POST /emotion` a real service |
 | Trained models | Git-ignored, regenerated from notebooks | Committed in `artifacts/` | Whoever clones can run the application immediately |
 | Datasets | Git-ignored | Still git-ignored; `scripts/download_datasets.py` fetches all ten | Not ours to redistribute |
@@ -107,9 +107,16 @@ their probabilities are averaged. We measured it
 
 ### Speech service (`backend/services/speech_service.py`)
 
-Without a Google key the server has no speech engine: `POST /transcribe`
-answers 503 with an explanation instead of returning a fake text. The mock
-provider only runs when `SPEECH_PROVIDER=mock` is set explicitly.
+`POST /transcribe` now runs a local model: Vosk (offline, Kaldi-based) with
+its small English model in `artifacts/`. The page records WAV audio and the
+server returns the text. The **Speech** button in the header switches between
+this and the browser's recognition; if the browser's recognition fails, the
+page switches by itself. We checked it with 15 synthetic-voice commands (all
+routed correctly); it has not been measured with our own voices yet.
+
+Without the model and without a Google key, `POST /transcribe` answers 503
+with an explanation instead of returning a fake text. The mock provider only
+runs when `SPEECH_PROVIDER=mock` is set explicitly.
 
 ### Report (`docs/report/`)
 
@@ -150,7 +157,8 @@ go to Overleaf and get the screenshots.
 
 ## Known limits (do not hide them)
 
-- Voice needs Chrome or Edge and an internet connection.
+- The browser's speech recognition needs Chrome or Edge and an internet
+  connection; the local model works anywhere but is less accurate.
 - Movie titles and commands are English only.
 - Car prices are in Indian rupees; the body fat model was trained on men
   only; avocado data ends in March 2018 and bitcoin data in July 2017.

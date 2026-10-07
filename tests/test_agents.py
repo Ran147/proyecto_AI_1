@@ -123,20 +123,10 @@ def test_transcribe_endpoint_google(monkeypatch):
 
 
 # ---------- Mock mode (no keys) ----------
-def test_transcribe_without_a_provider_says_so():
-    # No key: the server has no speech engine and must not invent a text.
-    assert client.get("/health").json()["speech_provider"] == "browser"
-    response = client.post(
-        "/transcribe", files={"audio": ("a.webm", b"123", "audio/webm")}
-    )
-    assert response.status_code == 503
-    assert "browser" in response.json()["detail"]
-
-
 def test_empty_provider_setting_means_auto(monkeypatch):
     monkeypatch.setenv("EMOTION_PROVIDER", "")
     monkeypatch.setenv("SPEECH_PROVIDER", "")
-    assert speech_service.provider_name() == "browser"
+    assert speech_service.provider_name() in ("local", "browser")
     assert emotion_service.provider_name() in ("local", "mock")
 
 

@@ -14,6 +14,8 @@ scikit-learn==1.9.1
 joblib==1.6.0
 # Local emotion recognition (YuNet + FER+ + HSEmotion through OpenCV)
 opencv-python-headless==5.0.0.93
+# Local speech-to-text (offline Kaldi recognizer)
+vosk==0.3.45
 
 # Tests
 pytest>=8

@@ -52,11 +52,12 @@ organization):
 
 **External APIs (R2, R3).** The course allows Google or Azure APIs for
 emotions and speech-to-text in the week-10 delivery only; the assignment notes
-mention Azure Face and Speech-to-Text. **Project decision:** speech-to-text
-uses the speech recognition built into Chrome and Edge (Web Speech API, served
-by Google's speech service), which needs no API key or billing account. The
-Google Cloud Speech-to-Text and Vision providers remain in the backend and
-take over when `GOOGLE_API_KEY` is set ([GOOGLE_SETUP.md](GOOGLE_SETUP.md)).
+mention Azure Face and Speech-to-Text. **Project decision:** nothing needs an
+API key or a billing account. Speech-to-text has two engines: the speech
+recognition built into Chrome and Edge (Web Speech API) and a local model on
+the server (Vosk). The Google Cloud Speech-to-Text and Vision providers
+remain in the backend and take over when `GOOGLE_API_KEY` is set
+([GOOGLE_SETUP.md](GOOGLE_SETUP.md)).
 Emotion recognition runs on a local model in the backend (YuNet face
 detector, then the FER+ and HSEmotion expression classifiers averaged; all
 pretrained and run with OpenCV), which also needs no key.
@@ -147,7 +148,7 @@ models. The history of the last big update is in [CHANGES.md](CHANGES.md).
 - Optional Google Vision provider, covered by tests with simulated
   responses.
 
-### R3. Speech-to-text and commands - done (browser recognition)
+### R3. Speech-to-text and commands - done (browser recognition and local model)
 
 - Speech recognition in the browser (`frontend/app.js`, Web Speech API,
   language `en-US`). Only the transcribed text is sent to `POST /command`.
@@ -159,9 +160,19 @@ models. The history of the last big update is in [CHANGES.md](CHANGES.md).
   ("gold price") match no model; `tests/test_routing.py` covers both sides.
 - Some commands carry data in the sentence ("organic avocado price",
   "recommend me a movie like Jurassic Park").
-- `POST /transcribe` runs Google Speech-to-Text when `GOOGLE_API_KEY` is
-  set. Without a key the server has no speech engine and answers 503 with an
-  explanation; it never returns an invented text.
+- Local model on the server (`backend/services/speech_service.py`): Vosk,
+  an offline Kaldi-based recognizer, with its small English model in
+  `artifacts/`. The interface records WAV audio (16-bit PCM, 16 kHz) and
+  `POST /transcribe` returns the text and a confidence. It works without
+  internet and in any browser. The **Speech** button switches between the
+  two engines, and the page switches to the local model by itself when the
+  browser's recognition fails.
+- Checked with 15 commands spoken by a synthetic voice: every transcription
+  reached the right model, in about 0.7 s each. Not yet measured with real
+  voices; the model's published word error rate is about 10 %.
+- `POST /transcribe` runs Google Speech-to-Text instead when
+  `GOOGLE_API_KEY` is set. With neither the model nor a key it answers 503
+  with an explanation; it never returns an invented text.
 
 ### R4, R6. Machine learning models and commands - 10 of 10 done
 

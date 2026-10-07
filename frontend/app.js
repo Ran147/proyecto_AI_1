@@ -4,10 +4,9 @@
  *   GET  /models      -> [{ name, title, keywords, default_input, input_fields, input_options }]
  *   POST /command     JSON { text, inputs_by_model } -> { matched, message, model, result, ... }
  *   POST /emotion     multipart field "image" -> { emotion, scores, provider }
- *   POST /transcribe  multipart field "audio" -> { text, confidence, provider }
- *                     (only when the server has a speech provider; otherwise
- *                     the browser's own speech recognition transcribes, see
- *                     "Microphone")
+ *   POST /transcribe  multipart field "audio" (WAV) -> { text, confidence, provider }
+ *                     (the server's local model or Google; the browser's own
+ *                     speech recognition is the other engine, see "Microphone")
  */
 
 // Optional API base URL, e.g. ?api=http://localhost:8000
@@ -17,7 +16,7 @@ const LANGUAGE = "en-US";
 
 const $ = (id) => document.getElementById(id);
 const el = {
-  apiStatus: $("apiStatus"), btnMute: $("btnMute"),
+  apiStatus: $("apiStatus"), btnMute: $("btnMute"), btnEngine: $("btnEngine"),
   video: $("video"), videoWrap: document.querySelector(".video-wrap"),
   btnCam: $("btnCam"), btnEmotion: $("btnEmotion"),
   emotionLabel: $("emotionLabel"), emotionNote: $("emotionNote"), emotionBars: $("emotionBars"),
@@ -41,14 +40,16 @@ const EMOTION_PREFIX = {
 };
 const NO_EMOTION_NOTE = "Turn the camera on so JarvisTEC can read your expression.";
 
-// speech: "server" sends the audio to POST /transcribe; "browser" uses the
-// Web Speech API of Chrome and Edge, which needs no API key; "none" when
-// neither is available.
-let state = { camOn: false, stream: null, recording: false, voice: true, emotion: "neutral", busy: false, speech: "none" };
+// speech: "server" records WAV audio and sends it to POST /transcribe (the
+// local model or Google); "browser" uses the Web Speech API of Chrome and
+// Edge; "none" when neither is available. serverSpeech is the provider the
+// server reports, or null when it has no engine.
+let state = { camOn: false, stream: null, recording: false, voice: true, emotion: "neutral", busy: false, speech: "none", serverSpeech: null };
+const ENGINE_LABELS = { local: "local model", google: "Google", mock: "simulated" };
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition = null;
 let currentUtterance = null;
-let rec = { media: null, chunks: [], stream: null, ctx: null, raf: 0 };
+let rec = { chunks: [], stream: null, ctx: null, raf: 0, node: null, rate: 0 };
 // Values the user edited in each model's data form: { model: { field: value } }.
 const customInputs = {};
 
@@ -101,19 +102,15 @@ async function init() {
   try {
     const h = await api("/health");
     el.apiStatus.className = "api ok";
-    // The server transcribes when it has a provider; otherwise the browser does.
-    if (["google", "mock"].includes(h.speech_provider)) state.speech = "server";
+    // Two speech engines: the browser's recognition and the server's
+    // (local model or Google). The browser is the default when it exists,
+    // unless the server was given a Google key; the button switches.
+    if (h.speech_provider in ENGINE_LABELS) state.serverSpeech = h.speech_provider;
+    if (state.serverSpeech && (state.serverSpeech !== "local" || !SpeechRecognition)) state.speech = "server";
     else if (SpeechRecognition) state.speech = "browser";
-    const notes = [];
-    if (state.speech === "browser") notes.push("voice: browser");
-    else if (state.speech === "none") notes.push("voice unavailable");
-    else if (h.speech_provider === "mock") notes.push("simulated voice");
-    if (h.emotion_provider === "mock") notes.push("simulated face");
-    el.apiStatus.lastElementChild.textContent =
-      [`API connected · ${h.models.length} models`, ...notes].join(" · ");
-    if (state.speech === "none") {
-      el.apiStatus.title = "This browser has no speech recognition: use Chrome or Edge, or type the command";
-    }
+    state.baseStatus = `API connected · ${h.models.length} models`;
+    state.simulatedFace = h.emotion_provider === "mock";
+    showSpeechEngine();
     const models = await api("/models");
     renderCommands(models);
   } catch (e) {
@@ -121,6 +118,22 @@ async function init() {
     el.apiStatus.lastElementChild.textContent = "API unavailable";
     el.commands.innerHTML = '<p class="muted">Could not load the commands. Is uvicorn running?</p>';
   }
+}
+function showSpeechEngine() {
+  const engine = state.speech === "browser" ? "browser"
+    : state.speech === "server" ? ENGINE_LABELS[state.serverSpeech] : null;
+  const notes = [engine ? `speech: ${engine}` : "speech unavailable"];
+  if (state.simulatedFace) notes.push("simulated face");
+  el.apiStatus.lastElementChild.textContent = [state.baseStatus, ...notes].join(" · ");
+  el.apiStatus.title = engine ? "" : "No speech recognition here: use Chrome or Edge, or type the command";
+  // The switch only makes sense when both engines exist.
+  el.btnEngine.hidden = !(SpeechRecognition && state.serverSpeech);
+  el.btnEngine.textContent = `Speech: ${engine}`;
+}
+function switchSpeechEngine() {
+  if (state.recording) return;
+  state.speech = state.speech === "browser" ? "server" : "browser";
+  showSpeechEngine();
 }
 function renderCommands(models) {
   el.commands.innerHTML = "";
@@ -432,23 +445,62 @@ async function toggleMic() {
   }
   stopSpeaking();
   rec.chunks = [];
-  rec.media = new MediaRecorder(rec.stream);  // usually webm/opus
-  rec.media.ondataavailable = e => e.data.size && rec.chunks.push(e.data);
-  rec.media.onstop = onRecordingDone;
-  rec.media.start();
   watchLevel(rec.stream);
+  captureSamples(rec.stream);
   showListening();
 }
 function stopRecording() {
   // The browser recognizer finishes in its own "end" event.
   if (recognition) return recognition.stop();
-  rec.media.stop();
+  const wav = encodeWav(rec.chunks, rec.rate);
   releaseMic();
+  onRecordingDone(wav);
+}
+
+/* Server engine: the raw microphone samples are kept and sent as a WAV file
+ * (16-bit PCM, mono, 16 kHz), the format the local model reads. */
+const WAV_RATE = 16000;
+function captureSamples(stream) {
+  rec.rate = rec.ctx.sampleRate;
+  const source = rec.ctx.createMediaStreamSource(stream);
+  rec.node = rec.ctx.createScriptProcessor(4096, 1, 1);
+  rec.node.onaudioprocess = (e) => {
+    if (state.recording) rec.chunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+  };
+  source.connect(rec.node);
+  rec.node.connect(rec.ctx.destination);  // required for the node to run
+}
+function encodeWav(chunks, rate) {
+  const total = chunks.reduce((n, c) => n + c.length, 0);
+  const input = new Float32Array(total);
+  let offset = 0;
+  for (const c of chunks) { input.set(c, offset); offset += c.length; }
+  // Downsample to 16 kHz by averaging the samples that fall in each step.
+  const step = rate / WAV_RATE;
+  const length = Math.floor(total / step);
+  const pcm = new Int16Array(length);
+  for (let i = 0; i < length; i++) {
+    const from = Math.floor(i * step), to = Math.min(total, Math.floor((i + 1) * step));
+    let sum = 0;
+    for (let j = from; j < to; j++) sum += input[j];
+    const value = Math.max(-1, Math.min(1, sum / Math.max(1, to - from)));
+    pcm[i] = value < 0 ? value * 0x8000 : value * 0x7fff;
+  }
+  const view = new DataView(new ArrayBuffer(44 + pcm.length * 2));
+  const text = (at, s) => { for (let i = 0; i < s.length; i++) view.setUint8(at + i, s.charCodeAt(i)); };
+  text(0, "RIFF"); view.setUint32(4, 36 + pcm.length * 2, true); text(8, "WAVE");
+  text(12, "fmt "); view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+  view.setUint32(24, WAV_RATE, true); view.setUint32(28, WAV_RATE * 2, true);
+  view.setUint16(32, 2, true); view.setUint16(34, 16, true);
+  text(36, "data"); view.setUint32(40, pcm.length * 2, true);
+  pcm.forEach((v, i) => view.setInt16(44 + i * 2, v, true));
+  return new Blob([view], { type: "audio/wav" });
 }
 function releaseMic() {
   state.recording = false;
   rec.stream?.getTracks().forEach(t => t.stop());
   rec.stream = null;
+  rec.node?.disconnect(); rec.node = null;
   cancelAnimationFrame(rec.raf); rec.ctx?.close(); rec.ctx = null;
   el.reactor.style.setProperty("--level", 0);
   el.btnMic.setAttribute("aria-pressed", "false"); el.micText.textContent = "Speak";
@@ -490,6 +542,15 @@ function startBrowserSpeech() {
       if (!(await sendCommand(text))) setState("idle");
       return;
     }
+    // The browser's recognition needs its vendor's online service; when
+    // that fails and the server has an engine, switch to it.
+    if (["network", "service-not-allowed"].includes(error) && state.serverSpeech) {
+      state.speech = "server";
+      showSpeechEngine();
+      const notice = `The browser's speech recognition is not available; switched to ${ENGINE_LABELS[state.serverSpeech]}. Press Speak again.`;
+      say(notice, true); logLine("err", notice); setState("idle");
+      return;
+    }
     // "aborted" only happens when the user stops before saying anything.
     const message = SPEECH_ERRORS[error] || NOT_UNDERSTOOD;
     say(message, true); logLine("err", message); setState("idle");
@@ -523,11 +584,10 @@ function watchLevel(stream) {
   };
   tick();
 }
-async function onRecordingDone() {
+async function onRecordingDone(blob) {
   setState("thinking"); say("Transcribing…");
-  const blob = new Blob(rec.chunks, { type: rec.media.mimeType || "audio/webm" });
   try {
-    const fd = new FormData(); fd.append("audio", blob, "audio.webm");
+    const fd = new FormData(); fd.append("audio", blob, "audio.wav");
     const { text, provider } = await api("/transcribe", { method: "POST", body: fd });
     if (!text) throw new Error(NOT_UNDERSTOOD);
     if (provider === "mock") logLine("err", "Simulated transcription (SPEECH_PROVIDER=mock).");
@@ -541,6 +601,7 @@ async function onRecordingDone() {
 el.btnCam.onclick = toggleCamera;
 el.btnEmotion.onclick = () => analyzeEmotion();
 el.btnMic.onclick = toggleMic;
+el.btnEngine.onclick = switchSpeechEngine;
 el.form.onsubmit = async (e) => {
   e.preventDefault();
   // The text is kept when the command could not be sent yet.

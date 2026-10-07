@@ -47,8 +47,8 @@ the repository) or create their own key in the same project.
 Nothing has to be configured:
 
 - Voice: the interface uses the speech recognition built into Chrome and
-  Edge and never calls `/transcribe`. `POST /transcribe` answers 503 and says
-  that no speech provider is configured.
+  Edge, or the local Vosk model on the server through `POST /transcribe`
+  (button **Speech** in the header).
 - Emotion: `/emotion` runs the local model (YuNet + FER+ + HSEmotion); its
   files are in `artifacts/`.
 

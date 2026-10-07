@@ -10,7 +10,10 @@ MAX_AUDIO_BYTES = 10 * 1024 * 1024
 
 @router.post("/transcribe")
 async def transcribe(audio: UploadFile = File(...)):
-    """Take audio (webm/ogg/wav) and return the transcribed text."""
+    """Take audio and return the transcribed text.
+
+    The local model takes WAV (16-bit PCM); Google also takes webm/ogg.
+    """
     data = await audio.read()
     if not data:
         raise HTTPException(422, "The audio is empty")
