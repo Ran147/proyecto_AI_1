@@ -1,7 +1,7 @@
 # Tested with Python 3.14.2. The libraries that read the trained models in
 # artifacts/ are pinned to the versions the models were saved with.
 fastapi>=0.110
-uvicorn[standard]>=0.29
+uvicorn>=0.29
 python-multipart>=0.0.9
 python-dotenv>=1.0
 pydantic>=2.6

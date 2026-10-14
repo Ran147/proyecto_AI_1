@@ -53,9 +53,9 @@ organization):
 **External APIs (R2, R3).** The course allows Google or Azure APIs for
 emotions and speech-to-text in the week-10 delivery only; the assignment notes
 mention Azure Face and Speech-to-Text. **Project decision:** nothing needs an
-API key or a billing account. Speech-to-text has two engines: the speech
-recognition built into Chrome and Edge (Web Speech API) and a local model on
-the server (Vosk). The Google Cloud Speech-to-Text and Vision providers
+API key or a billing account. Speech-to-text has two engines: the local model
+on the server (Vosk) by default, and the speech recognition built into Chrome
+and Edge (Web Speech API). The Google Cloud Speech-to-Text and Vision providers
 remain in the backend and take over when `GOOGLE_API_KEY` is set
 ([GOOGLE_SETUP.md](GOOGLE_SETUP.md)).
 Emotion recognition runs on a local model in the backend (YuNet face

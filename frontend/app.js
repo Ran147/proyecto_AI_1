@@ -108,11 +108,11 @@ async function init() {
   try {
     const h = await api("/health");
     el.apiStatus.className = "api ok";
-    // Two speech engines: the browser's recognition and the server's
-    // (local model or Google). The browser is the default when it exists,
-    // unless the server was given a Google key; the button switches.
+    // Two speech engines: the server's engine (local Vosk model or Google)
+    // and the browser's recognition. The local model on the server is preferred
+    // as the first option whenever available; the button switches between them.
     if (h.speech_provider in ENGINE_LABELS) state.serverSpeech = h.speech_provider;
-    if (state.serverSpeech && (state.serverSpeech !== "local" || !SpeechRecognition)) state.speech = "server";
+    if (state.serverSpeech) state.speech = "server";
     else if (SpeechRecognition) state.speech = "browser";
     state.baseStatus = `API connected · ${h.models.length} models`;
     state.simulatedFace = h.emotion_provider === "mock";

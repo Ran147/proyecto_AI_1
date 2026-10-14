@@ -9,13 +9,30 @@ Araya Arguedas.
 
 ## Quick start
 
-Run every command from the repository root. Tested with Python 3.14.
+Run every command from the repository root. Tested with Python 3.14+.
 
+### Windows (Git Bash)
 ```bash
 python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn backend.main:app --reload
+source .venv/Scripts/activate
+python -m pip install -r requirements.txt
+python -m uvicorn backend.main:app --reload
+```
+
+### Windows (PowerShell)
+```powershell
+python -m venv .venv
+.venv\Scripts\activate
+python -m pip install -r requirements.txt
+python -m uvicorn backend.main:app --reload
+```
+
+### Linux / macOS
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install -r requirements.txt
+python3 -m uvicorn backend.main:app --reload
 ```
 
 - Web interface: http://localhost:8000/ (use Chrome or Edge for voice)
@@ -26,11 +43,10 @@ That is all: the ten trained models, the emotion networks and the speech
 model are committed in `artifacts/`, and no API key is needed.
 
 - **Voice** has two engines, switched with the **Speech** button in the
-  header. The default is the browser's own speech recognition (Web Speech
-  API, Chrome or Edge, needs internet). The other is a local model on the
-  server (Vosk, offline, any browser, English and Spanish models): the page
-  records WAV audio and `POST /transcribe` returns the text. If the browser's recognition fails,
-  the page switches to the local model by itself.
+  header. The default is the local model on the server (Vosk, offline, any
+  browser, English and Spanish models): the page records WAV audio and
+  `POST /transcribe` returns the text. The other is the browser's own speech
+  recognition (Web Speech API, Chrome or Edge, needs internet).
 - **Emotion** runs on a local model in the backend: the YuNet face detector,
   then the FER+ and HSEmotion expression classifiers averaged, through OpenCV.
 - With `GOOGLE_API_KEY` in `.env` (copy `.env.example`), emotion and
