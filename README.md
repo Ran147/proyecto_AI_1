@@ -81,9 +81,6 @@ de hepatitis", "tipo de cirrosis".
 - A command without data answers for an example case. The **Data** button
   next to each command opens a form with the model's inputs; edited values
   also apply to later spoken or typed commands.
-- Three commands take data in the sentence: "red wine quality", "organic
-  avocado price", "recommend me a movie like Jurassic Park" (in Spanish:
-  "vino tinto", "aguacate orgánico", "una película como Jurassic Park").
 - The percentage in an answer is the model's estimate for that case, not the
   model's accuracy. The accuracy of each model is in its notebook and model
   card.
