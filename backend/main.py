@@ -52,6 +52,11 @@ def health(orchestrator: ModelOrchestrator = Depends(get_orchestrator)):
         "models": orchestrator.names(),
         "emotion_provider": emotion_service.provider_name(),
         "speech_provider": speech_service.provider_name(),
+        # Engines the interface can pick, and the number of each model for
+        # our speech engine ("scratch").
+        "speech_engines": speech_service.available_engines(),
+        "speech_numbers": speech_service.command_numbers(),
+        "emotion_models": emotion_service.available_classifiers(),
     }
 
 

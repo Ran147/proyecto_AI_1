@@ -12,7 +12,12 @@ training/
   <name>/               one folder per trained model
 ```
 
-`<name>` must match the `name` of the adapter in `backend/models/<name>/`.
+`<name>` must match the `name` of the adapter in `backend/models/<name>/`. The
+two networks trained from scratch for the agents, `emotion_cnn/` and
+`speech_commands/`, are not models of the command list: the emotion and
+speech services load their ONNX files directly. They need PyTorch, installed
+in a separate environment (`.venv-train`, see their READMEs); the backend
+does not.
 
 ## Workflow
 
@@ -52,6 +57,13 @@ Then create the inference adapter: see
   the model card). Its artifact is a lookup dictionary, not a `Pipeline`.
 - `hepatitis/`: trained (Random Forest, test macro F1 0.59).
 - `cirrhosis/`: trained (Random Forest, test macro F1 0.44).
+- `emotion_cnn/`: trained from scratch (convolutional network on FER-2013,
+  test accuracy 0.686, macro F1 0.660). Optional emotion classifier
+  (`EMOTION_MODEL=scratch`); the pretrained ones stay the default.
+- `speech_commands/`: trained from scratch (keyword spotter on Speech
+  Commands, test accuracy 0.976; 89 % of simulated spoken commands
+  recognized). Optional speech engine (`SPEECH_PROVIDER=scratch`): the
+  user says the number of a model. Vosk stays the default.
 
 Every notebook fixes `SEED = 42`. Run them one at a time: several notebooks
 executing at once can exhaust the memory and kill the kernel.

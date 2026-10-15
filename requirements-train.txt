@@ -1,0 +1,9 @@
+# Training of the two networks trained from scratch
+# (training/emotion_cnn/ and training/speech_commands/). Not needed to run
+# the application. Install PyTorch first, from the index that matches your
+# GPU, e.g.:
+#   pip install torch --index-url https://download.pytorch.org/whl/cu130
+# Tested with torch 2.14.1+cu130 on Python 3.14.
+-r requirements.txt
+soundfile>=0.12   # reads the Speech Commands WAV files
+onnx>=1.17        # exports the trained networks for OpenCV

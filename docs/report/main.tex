@@ -150,6 +150,35 @@ Two engines are available and the user switches between them with a button. \tex
 
 \textbf{Local engine.} The service runs Vosk, an offline recognizer built on the Kaldi toolkit~\cite{povey2011}, with its small English and Spanish models (about 40~MB each), stored in the repository. The page records the microphone as 16-bit mono WAV at 16~kHz and sends it to \code{POST /transcribe}, which returns the text and the mean confidence of its words. It needs no internet connection and works in any browser; if the browser engine fails, the page switches to this one by itself. The English model was checked with 15 commands spoken by a synthetic voice: every transcription reached the intended model, in about 0.7~s per command. The Spanish model was not checked with speech, and neither has been measured with real voices; the word error rate published for the model is about 10\,\%, so it is less accurate than the browser engine. Because the transcription of the wake word varies (``Jarvis TEC'', ``Jarvis tech'', ``yarvis tek''), the command router tolerates those variants. Neither engine needs an API key or a billing account. The service also includes a Google Cloud Speech-to-Text provider, activated by configuring an API key.
 
+\subsection{Networks trained from scratch (optional)}
+
+The engines above are pretrained by third parties. To have models of our own for the two agents, two convolutional networks were trained from random initialization, without pretrained weights, with PyTorch on public datasets, and exported to ONNX so that the service runs them with OpenCV like the others. The pretrained engines remain the default; each network is enabled with one setting in the \code{.env} file (\code{EMOTION\_MODEL=scratch} and \code{SPEECH\_PROVIDER=scratch}), with no switch in the interface. Their notebooks (\code{training/emotion\_cnn/} and \code{training/speech\_commands/}) follow the same six sections as the predictive models.
+
+\textbf{Emotion.} A VGG-style network~\cite{simonyan2015} of four convolutional blocks (4.8 million parameters) classifies a $48 \times 48$ grayscale face into seven emotions. It was trained on the 28\,709 training images of FER-2013~\cite{goodfellow2013} (10\,\% held out for validation) with class weights, label smoothing and data augmentation, and evaluated once on the 7178 test images (Table~\ref{tab:scratch}). It surpasses the pretrained FER+ and HSEmotion on the same images and lies within the range reported for networks trained from scratch on this dataset. Inside the application, where the face is cropped by YuNet instead of by the dataset, it reaches 0.643 accuracy on 420 test faces placed in a camera-sized frame, against 0.561 for the average of FER+ and HSEmotion. FER-2013 labels are noisy and 568 test images also appear in the training set, a known issue of the dataset.
+
+\textbf{Speech.} No public dataset contains the JarvisTEC phrases, so the network is a keyword spotter~\cite{sainath2015} trained on Speech Commands~\cite{warden2018}: 105\,829 one-second recordings of 35 English words by 2618 speakers. It classifies a log-mel spectrogram into twelve classes: the ten digits, any other word and silence. In the application the user says the number of a model (``JarvisTEC, three'' runs the third model); a one-second window slides over the recording and the most confident digit is taken. Training used background noise, time shifts and SpecAugment~\cite{park2019}. On the official test speakers, never heard in training, it reaches 0.976 accuracy (Table~\ref{tab:scratch}); on 400 simulated recordings of a word followed by a digit with background noise, it recognizes the right digit in 89\,\% of the cases, misses it in 10\,\% and chooses a wrong one in under 1\,\%. It does not understand sentences, Spanish or data inside the command, which is why Vosk stays the default.
+
+\begin{table}[H]
+\centering
+\caption{Networks trained from scratch on the test sets of their datasets, compared with their baselines.}
+\label{tab:scratch}
+\begin{tabular}{llrr}
+\toprule
+Agent & Model & Accuracy & Macro F1 \\
+\midrule
+Emotion (FER-2013) & Most frequent class & 0.247 & 0.057 \\
+ & PCA + logistic regression & 0.335 & 0.297 \\
+ & FER+ (pretrained) & 0.565 & 0.467 \\
+ & HSEmotion (pretrained) & 0.560 & 0.507 \\
+ & \textbf{CNN from scratch} & \textbf{0.686} & \textbf{0.660} \\
+\midrule
+Speech (Speech Commands) & Most frequent class & 0.154 & 0.022 \\
+ & Average spectrum + logistic regression & 0.600 & 0.618 \\
+ & \textbf{CNN from scratch} & \textbf{0.976} & \textbf{0.979} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \subsection{Common architecture of the predictive models}
 
 All the models follow the same process, documented in one notebook per model:
@@ -346,6 +375,8 @@ Several datasets are small (body fat, car price, cirrhosis, hepatitis), so their
 
 \bibitem{gegic2019} E. Gegic, B. Isakovic, D. Keco, Z. Masetic and J. Kevric, ``Car price prediction using machine learning techniques,'' \emph{TEM Journal}, vol. 8, no. 1, pp. 113--118, 2019.
 
+\bibitem{goodfellow2013} I. J. Goodfellow et al., ``Challenges in representation learning: A report on three machine learning contests,'' in \emph{Proc. Int. Conf. on Neural Information Processing (ICONIP)}, 2013, pp. 117--124.
+
 \bibitem{harper2015} F. M. Harper and J. A. Konstan, ``The MovieLens datasets: History and context,'' \emph{ACM Transactions on Interactive Intelligent Systems}, vol. 5, no. 4, 2015.
 
 \bibitem{he2009} H. He and E. A. Garcia, ``Learning from imbalanced data,'' \emph{IEEE Transactions on Knowledge and Data Engineering}, vol. 21, no. 9, pp. 1263--1284, 2009.
@@ -366,6 +397,8 @@ Several datasets are small (body fat, car price, cirrhosis, hepatitis), so their
 
 \bibitem{odonnell2016} M. J. O'Donnell et al., ``Global and regional effects of potentially modifiable risk factors associated with acute stroke in 32 countries (INTERSTROKE): a case-control study,'' \emph{The Lancet}, vol. 388, no. 10046, pp. 761--775, 2016.
 
+\bibitem{park2019} D. S. Park, W. Chan, Y. Zhang, C.-C. Chiu, B. Zoph, E. D. Cubuk and Q. V. Le, ``SpecAugment: A simple data augmentation method for automatic speech recognition,'' in \emph{Proc. Interspeech}, 2019, pp. 2613--2617.
+
 \bibitem{pedregosa2011} F. Pedregosa et al., ``Scikit-learn: Machine learning in Python,'' \emph{Journal of Machine Learning Research}, vol. 12, pp. 2825--2830, 2011.
 
 \bibitem{penrose1985} K. W. Penrose, A. G. Nelson and A. G. Fisher, ``Generalized body composition prediction equation for men using simple measurement techniques,'' \emph{Medicine and Science in Sports and Exercise}, vol. 17, no. 2, p. 189, 1985.
@@ -374,15 +407,21 @@ Several datasets are small (body fat, car price, cirrhosis, hepatitis), so their
 
 \bibitem{pudaruth2014} S. Pudaruth, ``Predicting the price of used cars using machine learning techniques,'' \emph{International Journal of Information \& Computation Technology}, vol. 4, no. 7, pp. 753--764, 2014.
 
+\bibitem{sainath2015} T. N. Sainath and C. Parada, ``Convolutional neural networks for small-footprint keyword spotting,'' in \emph{Proc. Interspeech}, 2015, pp. 1478--1482.
+
 \bibitem{saito2015} T. Saito and M. Rehmsmeier, ``The precision-recall plot is more informative than the ROC plot when evaluating binary classifiers on imbalanced datasets,'' \emph{PLoS ONE}, vol. 10, no. 3, e0118432, 2015.
 
 \bibitem{sarwar2001} B. Sarwar, G. Karypis, J. Konstan and J. Riedl, ``Item-based collaborative filtering recommendation algorithms,'' in \emph{Proc. 10th Int. Conf. on World Wide Web}, 2001, pp. 285--295.
 
 \bibitem{savchenko2022} A. V. Savchenko, L. V. Savchenko and I. Makarov, ``Classifying emotions and engagement in online learning based on a single facial expression recognition neural network,'' \emph{IEEE Transactions on Affective Computing}, vol. 13, no. 4, pp. 2132--2143, 2022.
 
+\bibitem{simonyan2015} K. Simonyan and A. Zisserman, ``Very deep convolutional networks for large-scale image recognition,'' in \emph{Proc. Int. Conf. on Learning Representations (ICLR)}, 2015.
+
 \bibitem{siri1956} W. E. Siri, ``The gross composition of the body,'' \emph{Advances in Biological and Medical Physics}, vol. 4, pp. 239--280, 1956.
 
 \bibitem{verbeke2012} W. Verbeke, K. Dejaeger, D. Martens, J. Hur and B. Baesens, ``New insights into churn prediction in the telecommunication sector: A profit driven data mining approach,'' \emph{European Journal of Operational Research}, vol. 218, no. 1, pp. 211--229, 2012.
+
+\bibitem{warden2018} P. Warden, ``Speech Commands: A dataset for limited-vocabulary speech recognition,'' arXiv:1804.03209, 2018.
 
 \bibitem{wolf1991} P. A. Wolf, R. B. D'Agostino, A. J. Belanger and W. B. Kannel, ``Probability of stroke: A risk profile from the Framingham Study,'' \emph{Stroke}, vol. 22, no. 3, pp. 312--318, 1991.
 

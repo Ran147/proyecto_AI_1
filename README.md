@@ -40,7 +40,7 @@ python3 -m uvicorn backend.main:app --reload
 - Status and registered models: http://localhost:8000/health
 
 That is all: the ten trained models, the emotion networks and the speech
-model are committed in `artifacts/`, and no API key is needed.
+models are committed in `artifacts/`, and no API key is needed.
 
 - **Voice** has two engines, switched with the **Speech** button in the
   header. The default is the local model on the server (Vosk, offline, any
@@ -49,6 +49,19 @@ model are committed in `artifacts/`, and no API key is needed.
   recognition (Web Speech API, Chrome or Edge, needs internet).
 - **Emotion** runs on a local model in the backend: the YuNet face detector,
   then the FER+ and HSEmotion expression classifiers averaged, through OpenCV.
+- **Our own networks, trained from scratch** (optional): an emotion
+  classifier trained on FER-2013 and a spoken-number recognizer trained on
+  Speech Commands. The pretrained models above stay the default; to use ours,
+  add to `.env`:
+
+  ```bash
+  EMOTION_MODEL=scratch     # our emotion network instead of FER+ and HSEmotion
+  SPEECH_PROVIDER=scratch   # our speech network: say "JarvisTEC, three" (the number of a model)
+  ```
+
+  and restart the server. See [training/emotion_cnn/](training/emotion_cnn/)
+  and [training/speech_commands/](training/speech_commands/) for how they
+  were trained and evaluated.
 - With `GOOGLE_API_KEY` in `.env` (copy `.env.example`), emotion and
   `POST /transcribe` switch to the Google Cloud APIs; see
   [docs/GOOGLE_SETUP.md](docs/GOOGLE_SETUP.md).
@@ -94,8 +107,8 @@ de hepatitis", "tipo de cirrosis".
 | GET | `/models/{name}` | Metadata of one model |
 | POST | `/models/{name}/predict` | Run a model. Body: `{"inputs": {...}}`; missing inputs take defaults |
 | POST | `/command` | Text to the right model. Body: `{"text": "JarvisTEC wine quality"}` |
-| POST | `/emotion` | Image (field `image`) to dominant emotion and scores |
-| POST | `/transcribe` | Audio (field `audio`, WAV; field `language`: `en` or `es`) to text, with the local model or Google |
+| POST | `/emotion` | Image (field `image`; optional `model`: `ensemble`, `ferplus`, `hsemotion` or `scratch`) to dominant emotion and scores |
+| POST | `/transcribe` | Audio (field `audio`, WAV; field `language`: `en` or `es`; optional `engine`) to text, with the local model, Google or, when configured, ours |
 
 `POST /transcribe` never returns an invented text: if the server has neither
 the local model nor a Google key, it answers 503 and says so.
@@ -138,7 +151,8 @@ frontend/               HTML, CSS and JavaScript interface
 training/               offline training; never imported by the backend
   _template/            notebook with the 6 rubric sections + model card template
   <name>/               notebook and model card of each model
-artifacts/              trained models (.joblib + .meta.json), emotion networks (.onnx), speech models
+artifacts/              trained models (.joblib + .meta.json), emotion networks (.onnx), speech models,
+                        and our two networks trained from scratch (emotion_cnn, speech_commands)
 scripts/                dataset and model downloads, emotion evaluation, timing
 tests/                  pytest suite; tests/models/ has one file per model
 data/                   datasets; git-ignored (scripts/download_datasets.py)
@@ -148,7 +162,7 @@ docs/                   project documentation and the written report (docs/repor
 ## Development
 
 ```bash
-python -m pytest                     # 342 tests
+python -m pytest                     # 354 tests
 pip install ruff && ruff check backend tests scripts   # PEP 8 lint (79 columns)
 ```
 
@@ -164,7 +178,10 @@ jupyter nbconvert --to notebook --execute --inplace training/wine/notebook.ipynb
 Other scripts: `scripts/download_emotion_models.py` and
 `scripts/download_speech_models.py` (re-fetch the emotion networks and the
 speech models, with hash check), `scripts/evaluate_emotion_model.py` (emotion
-classifiers on FER-2013), `scripts/measure_response_times.py`.
+classifiers on FER-2013), `scripts/evaluate_emotion_pipeline.py` (the
+whole emotion pipeline, face detector included),
+`scripts/measure_response_times.py`. Training the two networks from scratch
+needs PyTorch: `requirements-train.txt`.
 
 ## Documentation
 

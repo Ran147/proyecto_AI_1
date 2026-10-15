@@ -19,7 +19,7 @@ trained models are in the repository and no API key is required.
 - Click a command, or press **Speak** and say "JarvisTEC, wine quality".
 - Open **Data** next to a command to run the model with your own values.
 - Turn the camera on and press **Analyze emotion**.
-- `python -m pytest` should report 342 passed.
+- `python -m pytest` should report 354 passed.
 
 If the page looks old (Spanish labels), reload with Ctrl+F5.
 
@@ -128,6 +128,23 @@ routed correctly); it has not been measured with our own voices yet.
 Without the model and without a Google key, `POST /transcribe` answers 503
 with an explanation instead of returning a fake text. The mock provider only
 runs when `SPEECH_PROVIDER=mock` is set explicitly.
+
+### Two networks trained from scratch (optional)
+
+We also trained our own models for the two agents, from random
+initialization, with PyTorch on public datasets:
+
+- `training/emotion_cnn/`: a convolutional network on FER-2013. Test
+  accuracy 0.686 (FER+ gets 0.565 on the same faces).
+- `training/speech_commands/`: a keyword spotter on Speech Commands. It
+  recognizes the NUMBER of a model ("JarvisTEC, three" runs model 3), not
+  sentences. Test accuracy 0.976.
+
+The pretrained models stay the default. To try ours, put
+`EMOTION_MODEL=scratch` and/or `SPEECH_PROVIDER=scratch` in `.env` and
+restart. There is no switch in the interface on purpose. Training needs
+PyTorch in a separate environment (`requirements-train.txt`); the
+application only reads the exported `.onnx` files with OpenCV.
 
 ### Report (`docs/report/`)
 

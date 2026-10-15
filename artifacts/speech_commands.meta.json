@@ -1,0 +1,77 @@
+{
+  "model": "KeywordCNN (trained from scratch)",
+  "dataset": "Speech Commands v0.02 (Warden, 2018), CC BY 4.0",
+  "classes": [
+    "zero",
+    "one",
+    "two",
+    "three",
+    "four",
+    "five",
+    "six",
+    "seven",
+    "eight",
+    "nine",
+    "unknown",
+    "silence"
+  ],
+  "features": {
+    "sample_rate": 16000,
+    "clip_samples": 16000,
+    "window": 400,
+    "hop": 160,
+    "n_fft": 512,
+    "n_mels": 40,
+    "mel_low_hz": 20,
+    "mean": -6.439538478851318,
+    "std": 4.785582065582275
+  },
+  "detection": {
+    "threshold": 0.7,
+    "step_samples": 1600
+  },
+  "parameters": 963532,
+  "hyperparameters": {
+    "epochs": 40,
+    "best_epoch": 37,
+    "batch_size": 256,
+    "learning_rate": 0.003,
+    "weight_decay": 0.001,
+    "label_smoothing": 0.1,
+    "optimizer": "AdamW + OneCycleLR",
+    "seed": 42
+  },
+  "validation_accuracy": 0.978,
+  "test_metrics": {
+    "accuracy": 0.976,
+    "f1_macro": 0.9789,
+    "precision_macro": 0.9786,
+    "recall_macro": 0.9794,
+    "digit_precision": 0.9808,
+    "false_command_rate": 0.0414
+  },
+  "test_comparison": [
+    {
+      "model": "Most frequent class",
+      "accuracy": 0.1538,
+      "macro F1": 0.0222
+    },
+    {
+      "model": "Average spectrum + logistic regression",
+      "accuracy": 0.6,
+      "macro F1": 0.6181
+    },
+    {
+      "model": "CNN from scratch (ours)",
+      "accuracy": 0.976,
+      "macro F1": 0.9789
+    }
+  ],
+  "sentence_test": {
+    "commands_correct": 0.89,
+    "commands_missed": 0.1025,
+    "commands_wrong_digit": 0.0075,
+    "false_commands_without_digit": 0.065
+  },
+  "torch_version": "2.14.1+cu130"
+}

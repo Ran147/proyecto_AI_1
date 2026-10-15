@@ -55,7 +55,7 @@ def main() -> int:
         f"{e[:8]:>8}" for e in emotions
     )
     print(header)
-    for choice in ("ferplus", "hsemotion", "ensemble"):
+    for choice in ("scratch", "ferplus", "hsemotion", "ensemble"):
         os.environ["EMOTION_MODEL"] = choice
         predicted = []
         for face in faces:

@@ -4,9 +4,10 @@
  *   GET  /models      -> [{ name, title, keywords, default_input, input_fields, input_options }]
  *   POST /command     JSON { text, inputs_by_model } -> { matched, message, model, result, ... }
  *   POST /emotion     multipart field "image" -> { emotion, scores, provider }
- *   POST /transcribe  multipart field "audio" (WAV) -> { text, confidence, provider }
- *                     (the server's local model or Google; the browser's own
- *                     speech recognition is the other engine, see "Microphone")
+ *   POST /transcribe  multipart fields "audio" (WAV), "language", "engine" -> { text, confidence, provider }
+ *                     (the server's engine: Vosk, Google, or our model
+ *                     when SPEECH_PROVIDER=scratch; the browser's own
+ *                     speech recognition is another engine, see "Microphone")
  */
 
 // Optional API base URL, e.g. ?api=http://localhost:8000
@@ -46,12 +47,13 @@ const EMOTION_PREFIX = {
 };
 const NO_EMOTION_NOTE = "Turn the camera on so JarvisTEC can read your expression.";
 
-// speech: "server" records WAV audio and sends it to POST /transcribe (the
-// local model or Google); "browser" uses the Web Speech API of Chrome and
-// Edge; "none" when neither is available. serverSpeech is the provider the
-// server reports, or null when it has no engine.
-let state = { camOn: false, stream: null, recording: false, voice: true, emotion: "neutral", busy: false, speech: "none", serverSpeech: null, lang: "en", chips: [] };
-const ENGINE_LABELS = { local: "local model", google: "Google", mock: "simulated" };
+// speech: "server" records WAV audio and sends it to POST /transcribe with
+// the engine in serverSpeech (Vosk, Google, or our model when the server is
+// configured with SPEECH_PROVIDER=scratch); "browser" uses the
+// Web Speech API of Chrome and Edge; "none" when neither is available.
+// engines lists every engine the Speech button cycles through.
+let state = { camOn: false, stream: null, recording: false, voice: true, emotion: "neutral", busy: false, speech: "none", serverSpeech: null, engines: [], numbers: {}, lang: "en", chips: [] };
+const ENGINE_LABELS = { scratch: "our model (numbers)", local: "Vosk", google: "Google", mock: "simulated", browser: "browser" };
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition = null;
 let currentUtterance = null;
@@ -108,12 +110,17 @@ async function init() {
   try {
     const h = await api("/health");
     el.apiStatus.className = "api ok";
-    // Two speech engines: the server's engine (local Vosk model or Google)
-    // and the browser's recognition. The local model on the server is preferred
-    // as the first option whenever available; the button switches between them.
-    if (h.speech_provider in ENGINE_LABELS) state.serverSpeech = h.speech_provider;
-    if (state.serverSpeech) state.speech = "server";
-    else if (SpeechRecognition) state.speech = "browser";
+    // Speech engines: the server's (Vosk, Google, or our model when it is
+    // configured) and the browser's recognition. The server's default engine starts; the Speech
+    // button cycles through the rest.
+    const serverEngines = (h.speech_engines || []).filter(e => e in ENGINE_LABELS);
+    if (h.speech_provider === "mock") serverEngines.unshift("mock");
+    state.engines = [...serverEngines, ...(SpeechRecognition ? ["browser"] : [])];
+    state.numbers = Object.fromEntries(Object.entries(h.speech_numbers || {}).map(([word, model]) => [model, word]));
+    if (serverEngines.length) {
+      state.speech = "server";
+      state.serverSpeech = serverEngines.includes(h.speech_provider) ? h.speech_provider : serverEngines[0];
+    } else if (SpeechRecognition) state.speech = "browser";
     state.baseStatus = `API connected · ${h.models.length} models`;
     state.simulatedFace = h.emotion_provider === "mock";
     showSpeechEngine();
@@ -126,19 +133,29 @@ async function init() {
   }
 }
 function showSpeechEngine() {
-  const engine = state.speech === "browser" ? "browser"
+  const engine = state.speech === "browser" ? ENGINE_LABELS.browser
     : state.speech === "server" ? ENGINE_LABELS[state.serverSpeech] : null;
   const notes = [engine ? `speech: ${engine}` : "speech unavailable"];
   if (state.simulatedFace) notes.push("simulated face");
   el.apiStatus.lastElementChild.textContent = [state.baseStatus, ...notes].join(" · ");
   el.apiStatus.title = engine ? "" : "No speech recognition here: use Chrome or Edge, or type the command";
-  // The switch only makes sense when both engines exist.
-  el.btnEngine.hidden = !(SpeechRecognition && state.serverSpeech);
+  // The switch only makes sense when there is more than one engine.
+  el.btnEngine.hidden = state.engines.length < 2;
   el.btnEngine.textContent = `Speech: ${engine}`;
+  el.btnEngine.title = usesNumbers()
+    ? "Our model, trained from scratch, recognizes the NUMBER of a model: say \"JarvisTEC, three\". Click to switch engine."
+    : "Click to switch the speech recognition engine";
+  refreshChips();
+}
+function usesNumbers() {
+  return state.speech === "server" && state.serverSpeech === "scratch";
 }
 function switchSpeechEngine() {
-  if (state.recording) return;
-  state.speech = state.speech === "browser" ? "server" : "browser";
+  if (state.recording || !state.engines.length) return;
+  const current = state.speech === "browser" ? "browser" : state.serverSpeech;
+  const next = state.engines[(state.engines.indexOf(current) + 1) % state.engines.length];
+  if (next === "browser") state.speech = "browser";
+  else { state.speech = "server"; state.serverSpeech = next; }
   showSpeechEngine();
 }
 // Main phrase of a model in the language of the commands.
@@ -149,8 +166,16 @@ function switchCommandLanguage() {
   if (state.recording) return;
   state.lang = state.lang === "en" ? "es" : "en";
   el.btnLang.textContent = `Commands: ${COMMAND_LANGUAGES[state.lang].label}`;
-  state.chips.forEach(({ label, model }) => { label.textContent = `JarvisTEC, ${phraseOf(model)}`; });
+  refreshChips();
   el.typed.placeholder = `Or type a command: JarvisTEC, ${state.lang === "es" ? "calidad del vino" : "wine quality"}`;
+}
+// With our speech model the commands are numbers ("JarvisTEC, three").
+function chipText(m) {
+  const number = state.numbers[m.name];
+  return usesNumbers() && number ? `JarvisTEC, ${number}` : `JarvisTEC, ${phraseOf(m)}`;
+}
+function refreshChips() {
+  state.chips.forEach(({ label, model }) => { label.textContent = chipText(model); });
 }
 function renderCommands(models) {
   el.commands.innerHTML = "";
@@ -161,7 +186,7 @@ function renderCommands(models) {
     const b = document.createElement("button");
     b.className = "chip";
     b.innerHTML = "<b></b><small></small>";
-    b.querySelector("b").textContent = `JarvisTEC, ${phraseOf(m)}`;
+    b.querySelector("b").textContent = chipText(m);
     b.querySelector("small").textContent = m.title;
     b.onclick = () => sendCommand(`JarvisTEC ${phraseOf(m)}`);
     state.chips.push({ label: b.querySelector("b"), model: m });
@@ -562,7 +587,8 @@ function startBrowserSpeech() {
     }
     // The browser's recognition needs its vendor's online service; when
     // that fails and the server has an engine, switch to it.
-    if (["network", "service-not-allowed"].includes(error) && state.serverSpeech) {
+    if (["network", "service-not-allowed"].includes(error) && state.engines.some(e => e !== "browser")) {
+      state.serverSpeech = state.engines.find(e => e !== "browser");
       state.speech = "server";
       showSpeechEngine();
       const notice = `The browser's speech recognition is not available; switched to ${ENGINE_LABELS[state.serverSpeech]}. Press Speak again.`;
@@ -607,7 +633,9 @@ async function onRecordingDone(blob) {
   try {
     const fd = new FormData(); fd.append("audio", blob, "audio.wav");
     fd.append("language", state.lang);
-    const { text, provider } = await api("/transcribe", { method: "POST", body: fd });
+    if (state.serverSpeech) fd.append("engine", state.serverSpeech);
+    const { text, provider, heard } = await api("/transcribe", { method: "POST", body: fd });
+    if (heard) logLine("you", `Our speech model heard "${heard}".`);
     if (!text) throw new Error(NOT_UNDERSTOOD);
     if (provider === "mock") logLine("err", "Simulated transcription (SPEECH_PROVIDER=mock).");
     if (!(await sendCommand(text))) setState("idle");

@@ -1,0 +1,65 @@
+{
+  "model": "EmotionCNN (VGG-style, trained from scratch)",
+  "dataset": "FER-2013 (Kaggle msambare/fer2013)",
+  "classes": [
+    "anger",
+    "disgust",
+    "fear",
+    "happiness",
+    "neutral",
+    "sadness",
+    "surprise"
+  ],
+  "input": {
+    "size": 48,
+    "channels": "grayscale",
+    "scale": "pixel / 255"
+  },
+  "parameters": 4819271,
+  "hyperparameters": {
+    "epochs": 60,
+    "best_epoch": 56,
+    "batch_size": 128,
+    "learning_rate": 0.003,
+    "weight_decay": 0.0005,
+    "label_smoothing": 0.1,
+    "optimizer": "AdamW + OneCycleLR",
+    "class_weights": "inverse frequency",
+    "seed": 42
+  },
+  "validation_macro_f1": 0.6658,
+  "test_metrics": {
+    "accuracy": 0.6861,
+    "f1_macro": 0.6598,
+    "precision_macro": 0.6496,
+    "recall_macro": 0.6817
+  },
+  "test_comparison": [
+    {
+      "model": "Most frequent class",
+      "accuracy": 0.2471,
+      "macro F1": 0.0566
+    },
+    {
+      "model": "PCA + logistic regression",
+      "accuracy": 0.3348,
+      "macro F1": 0.297
+    },
+    {
+      "model": "CNN from scratch (ours)",
+      "accuracy": 0.6861,
+      "macro F1": 0.6598
+    },
+    {
+      "model": "FER+ (pretrained)",
+      "accuracy": 0.5646,
+      "macro F1": 0.4667
+    },
+    {
+      "model": "HSEmotion (pretrained, other domain)",
+      "accuracy": 0.5599,
+      "macro F1": 0.5066
+    }
+  ],
+  "torch_version": "2.14.1+cu130"
+}

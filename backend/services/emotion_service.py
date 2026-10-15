@@ -2,12 +2,20 @@
 
 Single entry point: ``detect_emotion(image_bytes)``. Providers:
 
-- ``local``: runs in the backend with OpenCV. YuNet finds the face and two
-  pretrained networks classify its expression: FER+ (grayscale, 64x64) and
-  HSEmotion (EfficientNet-B0 trained on AffectNet, color, 224x224). Their
-  probabilities are averaged, which recognizes sadness, anger and fear better
-  than FER+ alone (see scripts/evaluate_emotion_model.py). No API key; it
-  needs the ONNX files fetched by ``scripts/download_emotion_models.py``.
+- ``local``: runs in the backend with OpenCV. YuNet (pretrained) finds the
+  face and a classifier reads its expression. The classifier is chosen with
+  the EMOTION_MODEL setting (.env), or per request through the API:
+
+  - ``ensemble`` (default): the average of two pretrained networks, FER+
+    (grayscale, 64x64) and HSEmotion (EfficientNet-B0 trained on AffectNet,
+    color, 224x224).
+  - ``ferplus`` or ``hsemotion``: one pretrained network alone.
+  - ``scratch``: our own convolutional network, trained from random
+    initialization on FER-2013 (training/emotion_cnn/), grayscale 48x48.
+    Optional: set EMOTION_MODEL=scratch to use it.
+
+  No API key. The pretrained ONNX files are fetched by
+  ``scripts/download_emotion_models.py``; ours is committed in artifacts/.
 - ``google``: Google Cloud Vision face detection (needs GOOGLE_API_KEY).
 - ``mock``: random answer, for development only.
 
@@ -33,6 +41,8 @@ MODELS_DIR = Path(__file__).resolve().parents[2] / "artifacts"
 FACE_MODEL = MODELS_DIR / "face_detection_yunet_2023mar.onnx"
 EMOTION_MODEL = MODELS_DIR / "emotion-ferplus-8.onnx"
 HSEMOTION_MODEL = MODELS_DIR / "enet_b0_8_best_afew.onnx"
+# Our network, trained from scratch (training/emotion_cnn/notebook.ipynb).
+SCRATCH_MODEL = MODELS_DIR / "emotion_cnn.onnx"
 # Output order of the FER+ network.
 FERPLUS_CLASSES = (
     "neutral",
@@ -57,6 +67,29 @@ HSEMOTION_CLASSES = (
     "sadness",
     "surprise",
 )
+# Output order of our network (training/emotion_cnn/notebook.ipynb). It takes
+# a 48x48 grayscale face with pixel values scaled to 0-1, like FER-2013.
+SCRATCH_CLASSES = (
+    "anger",
+    "disgust",
+    "fear",
+    "happiness",
+    "neutral",
+    "sadness",
+    "surprise",
+)
+SCRATCH_SIZE = 48
+# FER-2013 faces are cropped tighter than YuNet's box: our network reads the
+# central 85 % of the box (the best share on FER-2013 validation faces).
+SCRATCH_CROP_SCALE = 0.85
+# Classifier choices: name -> networks whose probabilities are averaged.
+CLASSIFIER_CHOICES = {
+    "ensemble": ["ferplus", "hsemotion"],
+    "ferplus": ["ferplus"],
+    "hsemotion": ["hsemotion"],
+    "scratch": ["scratch"],
+}
+DEFAULT_CLASSIFIER = "ensemble"
 # HSEmotion takes a 224x224 RGB face normalized with the ImageNet statistics.
 HSEMOTION_SIZE = 224
 IMAGENET_MEAN = (0.485, 0.456, 0.406)
@@ -96,28 +129,55 @@ VISION_FIELDS = {
 NEUTRAL_THRESHOLD = 0.5
 
 
+NETWORK_FILES = {
+    "scratch": SCRATCH_MODEL,
+    "ferplus": EMOTION_MODEL,
+    "hsemotion": HSEMOTION_MODEL,
+}
+
+
 def local_models_available() -> bool:
-    """Tell whether the ONNX files the local provider needs are in place.
+    """Tell whether the face detector and at least one classifier exist."""
+    return FACE_MODEL.exists() and any(
+        path.exists() for path in NETWORK_FILES.values()
+    )
 
-    HSEmotion is optional: without it only FER+ classifies.
+
+def available_classifiers() -> list[str]:
+    """Classifier choices whose ONNX files are all in place."""
+    return [
+        choice
+        for choice, networks in CLASSIFIER_CHOICES.items()
+        if all(NETWORK_FILES[name].exists() for name in networks)
+    ]
+
+
+def check_classifier(choice: str | None) -> str | None:
+    """Validate a per-request classifier choice; unknown ones answer 422."""
+    if not choice:
+        return None
+    code = choice.lower()
+    if code not in CLASSIFIER_CHOICES:
+        options = ", ".join(CLASSIFIER_CHOICES)
+        raise HTTPException(
+            422, f"Unknown emotion model '{choice}': use one of {options}"
+        )
+    return code
+
+
+def local_classifiers(choice: str | None = None) -> list[str]:
+    """Networks the local provider runs for ``choice``.
+
+    Without a choice, EMOTION_MODEL decides (default ``ensemble``). A choice
+    whose files are missing falls back to the first available one.
     """
-    return FACE_MODEL.exists() and EMOTION_MODEL.exists()
-
-
-def local_classifiers() -> list[str]:
-    """Return the classifiers the local provider uses: EMOTION_MODEL env.
-
-    ``ensemble`` (default) averages FER+ and HSEmotion; ``ferplus`` and
-    ``hsemotion`` use a single network.
-    """
-    choice = os.getenv("EMOTION_MODEL", "ensemble").lower()
-    wanted = {
-        "ferplus": ["ferplus"],
-        "hsemotion": ["hsemotion"],
-    }.get(choice, ["ferplus", "hsemotion"])
-    if not HSEMOTION_MODEL.exists():
-        return ["ferplus"]
-    return wanted
+    choice = (
+        choice or os.getenv("EMOTION_MODEL") or DEFAULT_CLASSIFIER
+    ).lower()
+    available = available_classifiers()
+    if choice not in available:
+        choice = available[0] if available else DEFAULT_CLASSIFIER
+    return CLASSIFIER_CHOICES[choice]
 
 
 def provider_name() -> str:
@@ -192,11 +252,11 @@ def parse_vision_response(data: dict) -> dict:
     }
 
 
-async def _detect_google(image_bytes: bytes) -> dict:
+async def _detect_google(image_bytes: bytes, model: str | None) -> dict:
     return parse_vision_response(await _call_vision(image_bytes))
 
 
-async def _detect_mock(image_bytes: bytes) -> dict:
+async def _detect_mock(image_bytes: bytes, model: str | None) -> dict:
     """Simulated provider for work without credentials; ignores the image."""
     emotion = os.getenv("MOCK_EMOTION") or random.choice(
         ["happiness", "neutral", "sadness", "surprise", "anger"]
@@ -219,16 +279,16 @@ class LocalEmotionModel:
         self.detector = cv2.FaceDetectorYN.create(
             str(FACE_MODEL), "", (320, 320), FACE_THRESHOLD
         )
-        self.ferplus = cv2.dnn.readNetFromONNX(str(EMOTION_MODEL))
-        self.hsemotion = (
-            cv2.dnn.readNetFromONNX(str(HSEMOTION_MODEL))
-            if HSEMOTION_MODEL.exists()
-            else None
-        )
+        # Every classifier whose file is present; each runs on demand.
+        self.networks = {
+            name: cv2.dnn.readNetFromONNX(str(path))
+            for name, path in NETWORK_FILES.items()
+            if path.exists()
+        }
         # OpenCV networks are not safe to run from two threads at once.
         self.lock = threading.Lock()
 
-    def predict(self, image_bytes: bytes) -> dict:
+    def predict(self, image_bytes: bytes, choice: str | None = None) -> dict:
         cv2, np = self.cv2, self.np
         image = cv2.imdecode(
             np.frombuffer(image_bytes, np.uint8), cv2.IMREAD_COLOR
@@ -251,7 +311,15 @@ class LocalEmotionModel:
                 raise HTTPException(422, NO_FACE_MESSAGE)
             # Largest face: the user sitting in front of the camera.
             face = max(faces, key=lambda row: row[2] * row[3])
-            scores, used = self._classify(self._crop(image, face[:4]))
+            x, y, w, h = face[:4]
+            shrink = SCRATCH_CROP_SCALE
+            tight = self._crop(image, (
+                x + w * (1 - shrink) / 2, y + h * (1 - shrink) / 2,
+                w * shrink, h * shrink,
+            ))
+            scores, used = self._classify(
+                self._crop(image, face[:4]), choice, tight
+            )
         return {
             "emotion": max(scores, key=scores.get),
             "scores": scores,
@@ -260,21 +328,41 @@ class LocalEmotionModel:
             "face_confidence": round(float(face[14]), 4),
         }
 
-    def classify(self, face) -> dict[str, float]:
+    def classify(self, face, choice: str | None = None) -> dict[str, float]:
         """Classify an already cropped BGR face (used by the evaluation)."""
         with self.lock:
-            return self._classify(face)[0]
+            return self._classify(face, choice)[0]
 
-    def _classify(self, face) -> tuple[dict[str, float], list[str]]:
-        """Average the probabilities of the active classifiers."""
-        used = local_classifiers()
-        if self.hsemotion is None:
-            used = ["ferplus"]
-        runs = {"ferplus": self._run_ferplus, "hsemotion": self._run_hsemotion}
-        results = [runs[name](face) for name in used]
+    def _classify(
+        self, face, choice: str | None = None, tight_face=None
+    ) -> tuple[dict[str, float], list[str]]:
+        """Average the probabilities of the chosen classifiers.
+
+        ``tight_face`` is the tighter crop our network reads; without it
+        (an already cropped face) every network reads ``face``.
+        """
+        used = [
+            name for name in local_classifiers(choice)
+            if name in self.networks
+        ]
+        runs = {
+            "scratch": self._run_scratch,
+            "ferplus": self._run_ferplus,
+            "hsemotion": self._run_hsemotion,
+        }
+        results = [
+            runs[name](
+                tight_face if name == "scratch" and tight_face is not None
+                else face
+            )
+            for name in used
+        ]
+        # Our network has no "contempt" class: it counts as 0 there.
         scores = {
             emotion: round(
-                sum(result[emotion] for result in results) / len(results), 4
+                sum(result.get(emotion, 0.0) for result in results)
+                / len(results),
+                4,
             )
             for emotion in FERPLUS_CLASSES
         }
@@ -284,14 +372,26 @@ class LocalEmotionModel:
         exp = self.np.exp(logits - logits.max())
         return exp / exp.sum()
 
+    def _run_scratch(self, face) -> dict[str, float]:
+        cv2, np = self.cv2, self.np
+        gray = cv2.cvtColor(face, cv2.COLOR_BGR2GRAY)
+        blob = cv2.resize(gray, (SCRATCH_SIZE, SCRATCH_SIZE)).astype(
+            np.float32
+        ) / 255
+        network = self.networks["scratch"]
+        network.setInput(blob.reshape(1, 1, SCRATCH_SIZE, SCRATCH_SIZE))
+        probabilities = self._softmax(network.forward().ravel())
+        return dict(zip(SCRATCH_CLASSES, map(float, probabilities)))
+
     def _run_ferplus(self, face) -> dict[str, float]:
         cv2, np = self.cv2, self.np
         gray = cv2.cvtColor(face, cv2.COLOR_BGR2GRAY)
         blob = cv2.resize(gray, (FERPLUS_SIZE, FERPLUS_SIZE)).astype(
             np.float32
         )
-        self.ferplus.setInput(blob.reshape(1, 1, FERPLUS_SIZE, FERPLUS_SIZE))
-        probabilities = self._softmax(self.ferplus.forward().ravel())
+        network = self.networks["ferplus"]
+        network.setInput(blob.reshape(1, 1, FERPLUS_SIZE, FERPLUS_SIZE))
+        probabilities = self._softmax(network.forward().ravel())
         return dict(zip(FERPLUS_CLASSES, map(float, probabilities)))
 
     def _run_hsemotion(self, face) -> dict[str, float]:
@@ -301,10 +401,9 @@ class LocalEmotionModel:
             cv2.COLOR_BGR2RGB,
         )
         blob = (rgb.astype(np.float32) / 255 - IMAGENET_MEAN) / IMAGENET_STD
-        self.hsemotion.setInput(
-            blob.astype(np.float32).transpose(2, 0, 1)[None]
-        )
-        probabilities = self._softmax(self.hsemotion.forward().ravel())
+        network = self.networks["hsemotion"]
+        network.setInput(blob.astype(np.float32).transpose(2, 0, 1)[None])
+        probabilities = self._softmax(network.forward().ravel())
         return dict(zip(HSEMOTION_CLASSES, map(float, probabilities)))
 
     def _crop(self, image, box):
@@ -349,9 +448,11 @@ def _get_local_model() -> LocalEmotionModel:
     return _local_model
 
 
-async def _detect_local(image_bytes: bytes) -> dict:
+async def _detect_local(image_bytes: bytes, model: str | None) -> dict:
     # CPU-bound: run outside the event loop.
-    return await asyncio.to_thread(_get_local_model().predict, image_bytes)
+    return await asyncio.to_thread(
+        _get_local_model().predict, image_bytes, model
+    )
 
 
 PROVIDERS = {
@@ -361,9 +462,13 @@ PROVIDERS = {
 }
 
 
-async def detect_emotion(image_bytes: bytes) -> dict:
-    """Detect the dominant emotion with the active provider."""
+async def detect_emotion(image_bytes: bytes, model: str | None = None) -> dict:
+    """Detect the dominant emotion with the active provider.
+
+    ``model`` picks the classifier of the local provider for this request
+    (see CLASSIFIER_CHOICES); the other providers ignore it.
+    """
     name = provider_name()
     if name not in PROVIDERS:
         raise HTTPException(500, f"Invalid EMOTION_PROVIDER: {name}")
-    return await PROVIDERS[name](image_bytes)
+    return await PROVIDERS[name](image_bytes, check_classifier(model))

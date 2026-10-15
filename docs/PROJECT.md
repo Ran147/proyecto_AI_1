@@ -147,6 +147,13 @@ models. The history of the last big update is in [CHANGES.md](CHANGES.md).
   recognized in fewer than a third of the test faces.
 - Optional Google Vision provider, covered by tests with simulated
   responses.
+- **Our own emotion network, trained from scratch** (optional,
+  `EMOTION_MODEL=scratch`): a VGG-style convolutional network trained from
+  random initialization on FER-2013 (`training/emotion_cnn/`). Test accuracy
+  0.686 and macro F1 0.660 on the 7178 test faces, against 0.565 / 0.467
+  for FER+; inside the application pipeline (YuNet crop,
+  `scripts/evaluate_emotion_pipeline.py`) 0.643 against 0.561 for the
+  default average. The pretrained average stays the default.
 
 ### R3. Speech-to-text and commands - done (browser recognition and local model)
 
@@ -182,6 +189,12 @@ models. The history of the last big update is in [CHANGES.md](CHANGES.md).
 - `POST /transcribe` runs Google Speech-to-Text instead when
   `GOOGLE_API_KEY` is set. With neither the model nor a key it answers 503
   with an explanation; it never returns an invented text.
+- **Our own speech network, trained from scratch** (optional,
+  `SPEECH_PROVIDER=scratch`): a keyword spotter trained from random
+  initialization on Speech Commands (`training/speech_commands/`). It
+  recognizes the spoken number of a model ("JarvisTEC, three"), in English;
+  test accuracy 0.976 on 250 unseen speakers, and 89 % of simulated spoken
+  commands recognized (under 1 % wrong). Vosk stays the default.
 
 ### R4, R6. Machine learning models and commands - 10 of 10 done
 
